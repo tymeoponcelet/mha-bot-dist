@@ -38,7 +38,10 @@ from types import SimpleNamespace
 import cv2
 import numpy as np
 
+import emulateur
+import fastmatch
 import heroes
+import journal
 import nav
 import refill
 import watchdog
@@ -169,6 +172,26 @@ def init_adb():
             print(f"(!) appareil '{DEVICE}' absent, on prend '{devs[0]}'")
         DEVICE = devs[0]
     print(f"ADB : {ADB} | appareil : {DEVICE}")
+    emulateur.remember()               # instance MuMu a relancer si l'emulateur plante (voir emulateur.py)
+
+
+def _find_device():
+    """Pour la reprise (emulateur.py) : appareil visible par ADB (ports connus compris), ou None."""
+    def devs():
+        try:
+            out = subprocess.run([ADB, "devices"], capture_output=True, text=True, timeout=15).stdout.splitlines()[1:]
+        except Exception:
+            return []
+        return [l.split()[0] for l in out if l.strip().endswith("device")]
+    d = devs()
+    if not d:
+        for p in PORTS:
+            try:
+                subprocess.run([ADB, "connect", p], capture_output=True, timeout=6)
+            except Exception:
+                pass
+        d = devs()
+    return DEVICE if DEVICE in d else (d[0] if d else None)
 
 
 def adb(*args, binary=False, timeout=30):
@@ -179,16 +202,22 @@ def adb(*args, binary=False, timeout=30):
 
 
 def screenshot():
+    global DEVICE
     err = None
     for _ in range(5):
         try:
             png = adb("exec-out", "screencap", "-p", binary=True)
             img = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_COLOR)
             if img is not None:
+                journal.frame(img)             # boite noire (dernieres captures, en cas d'incident)
                 return img
         except Exception as e:
             err = e
         time.sleep(2)
+    dev = emulateur.recover(ADB, _find_device, log, why=str(err))     # ADB / MuMu relances, alerte Discord
+    if dev:
+        DEVICE = dev
+        return screenshot()
     raise SystemExit(f"Capture impossible ({err}). L'emulateur est-il toujours connecte ?")
 
 
@@ -205,24 +234,31 @@ class Tpl:
         H, W = full.shape[:2]
         x0, y0, x1, y1 = int(crop[0] * W), int(crop[1] * H), int(crop[2] * W), int(crop[3] * H)
         self.full, self.size, self.off = full, (W, H), (x0, y0)
+        self.name = f"{Path(path).parent.name}/{Path(path).name}"     # pour la detection de derive (derive.py)
         self.tap, self.thr, self.mask_white = tap, thr, mask_white
         self.img = self._prep(full[y0:y1, x0:x1])
+        fastmatch.prepare(self)                 # reconnaissance rapide (voir fastmatch.py), comme les autres modes
 
     def _prep(self, img):
         # AUTO : on compare uniquement les pixels blancs (le decor derriere change d'un combat a l'autre)
         return cv2.inRange(img, (200, 200, 200), (255, 255, 255)) if self.mask_white else img
 
-    def best(self, screen):
-        scr = self._prep(screen)
-        if scr.shape[0] < self.img.shape[0] or scr.shape[1] < self.img.shape[1]:
-            return 0.0, (0, 0)
-        res = cv2.matchTemplate(scr, self.img, cv2.TM_CCOEFF_NORMED)
-        _, score, _, loc = cv2.minMaxLoc(res)
-        return (0.0 if np.isnan(score) else float(score)), loc
+    prep = _prep                                # nom attendu par fastmatch
+
+    def best(self, screen, thr=None):
+        """Meme score que la comparaison couleur sur toute la capture, ~10x plus vite (fastmatch).
+        thr : seuil plus bas que celui de l'image (find(screen, 0.80)) -> fastmatch verifie a partir de ce seuil-la."""
+        base = self.thr
+        if thr is not None and thr < base:
+            self.thr = thr
+        try:
+            return fastmatch.best(self, screen)
+        finally:
+            self.thr = base
 
     def find(self, screen, thr=None):
         """-> (x_tap, y_tap, score, (x_haut_gauche, y_haut_gauche)) ou None"""
-        score, loc = self.best(screen)
+        score, loc = self.best(screen, thr)
         if score < (thr or self.thr):
             return None
         W, H = self.size
@@ -670,6 +706,7 @@ def main():
             RF = None
         else:
             log(f"Recharge de stamina : ACTIVEE (code {RF.code} x{RF.count})")
+    REPRISE = nav.Reprise(nav.Home(screenshot, tap, log, back=lambda: adb("shell", "input", "keyevent", "4")), log)   # ecran inconnu 60 s -> menu + reprise
     WD = watchdog.make(screenshot, tap, adb, log, Done)      # chien de garde (option) : maintenance / jeu bloque -> relance
     S.done, S.cur, S.no_att, S.battles = set(), None, False, 0
     reset_scan()
@@ -697,6 +734,12 @@ def main():
         if S.stage is None:
             guess = detect_stage(screen)
             set_stage(guess or "wait_ua")
+        if (S.stage != "battle" and REPRISE.due(now - S.progress)
+                and not any(h for h in fastmatch.find_many(T.items(), screen).values())   # aucune image reconnue
+                and REPRISE.run()):
+            S.no_att, S.stage, S.progress = False, None, time.time()     # comme apres le garde-chien
+            GATE.reset()
+            continue
         if now - S.progress > IDLE_LIMIT and not WD:
             raise Done(f"Plus aucune action depuis {IDLE_LIMIT}s : arret (ecran inattendu ?).")
         acted = HANDLERS[S.stage](screen)
@@ -713,9 +756,6 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Done as e:
-        print(e)
-    except KeyboardInterrupt:
-        print("Arrete.")
+    import journal
+    journal.start("herotrial")                 # journal de session dans logs/ (garde les 10 derniers)
+    journal.run(main, Done)               # meme affichage qu'avant + incident (capture, boite noire) si arret anormal

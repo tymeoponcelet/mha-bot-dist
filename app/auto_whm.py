@@ -292,6 +292,8 @@ def main():
         nav.Home(nt.screenshot, nt.tap, log, back=lambda: nt.adb("shell", "input", "keyevent", "4")).go()
     HOME = nav.Home(nt.screenshot, nt.tap, log, back=lambda: nt.adb("shell", "input", "keyevent", "4"))
     RF = nt.make_refill()                              # recharge de stamina (option)
+    REPRISE = nav.Reprise(HOME, log)    # ecran inconnu 60 s -> menu + reprise
+    seen_t = time.time()                # derniere fois qu'une image a ete reconnue
     WD = watchdog.make(nt.screenshot, nt.tap, nt.adb, log, Done)    # chien de garde (option)
     last_tap = {n: 0.0 for n in SPEC}
     runs, auto_taps, nav_taps = 0, 0, 0
@@ -360,14 +362,18 @@ def main():
         if fast_acted:
             continue
 
-        hits = {}
         panel_open_prev = confirmed or awaiting_pick or bool(GATE.swap_t)
+        need = []
         for key, t in T.items():
             if in_battle and key not in BATTLE_ONLY and now - t_start <= nt.BATTLE_END_DELAY:
                 continue                               # juste apres Start : l'ancien ecran peut rester visible un instant
             if panel_open_prev and key in BEHIND_KEYS:
                 continue                               # panneau de l'equipe ouvert : inutile de chercher l'ecran de derriere
-            h = fast_seen[key] if key in fast_seen else t.find(screen)
+            need.append(key)
+        found = fastmatch.find_many([(k, T[k]) for k in need if k not in fast_seen], screen)   # en parallele, meme resultat
+        hits = {}
+        for key in need:
+            h = fast_seen[key] if key in fast_seen else found[key]
             if h:
                 hits[key] = h
 
@@ -544,6 +550,16 @@ def main():
                 log("tous les multi-runs sont faits : je quitte le mode")
                 HOME.go(timeout=45)
             raise Done(f"{runs}/{MAX_RUNS} multi-run(s) termine(s). Fini !")
+        if hits:
+            seen_t = now
+        if not in_battle and REPRISE.due(now - max(last_action, seen_t)) and REPRISE.run():
+            in_battle, awaiting_pick, multi_done, auto_taps, nav_taps = False, False, False, 0, 0     # comme apres le garde-chien
+            confirmed, back_t, fights = False, 0.0, 0
+            PICK.reset()
+            GATE.reset()
+            last_tap = {n: 0.0 for n in SPEC}
+            last_action = seen_t = time.time()
+            continue
         if not in_battle and now - last_action > nt.IDLE_LIMIT and not WD:
             try:                                       # capture de l'ecran bloque : pour savoir quelle image manque
                 d = BASE / "debug"
@@ -559,9 +575,6 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Done as e:
-        print(e)
-    except KeyboardInterrupt:
-        print("Arrete.")
+    import journal
+    journal.start("whm")                 # journal de session dans logs/ (garde les 10 derniers)
+    journal.run(main, Done)               # meme affichage qu'avant + incident (capture, boite noire) si arret anormal

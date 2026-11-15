@@ -15,11 +15,16 @@ on repasse automatiquement en couleur sur toute la capture : jamais de perte de 
 Pour revenir a l'ancienne methode (tout en couleur, lent) : lancer le bot avec  --slow-match
 """
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 import cv2
 import numpy as np
 
+import derive
+
 FAST = "--slow-match" not in sys.argv
+WORKERS = 4                    # recherches en parallele (OpenCV libere le GIL) : ~3x plus vite, resultats identiques
+_POOL = None
 COARSE_SCALE = 0.5             # echelle du reperage rapide
 COARSE_MARGIN = 0.15           # on verifie en couleur des que le reperage depasse (seuil - cette marge)
 TRACK_MARGIN = 24              # px cherches autour du dernier emplacement connu
@@ -73,7 +78,15 @@ def full(t, screen):
 
 
 def best(t, screen):
-    """Meilleur score de l'image t dans la capture. t doit avoir : img, gimg, simg, thr, last, prep()."""
+    """Meilleur score de l'image t dans la capture. t doit avoir : img, gimg, simg, thr, last, prep().
+    Chaque detection (score >= seuil) est notee pour la detection de derive (derive.py)."""
+    score, loc = _best(t, screen)
+    if score >= t.thr:
+        derive.note(t, score)
+    return score, loc
+
+
+def _best(t, screen):
     if not FAST or getattr(t, "gimg", None) is None:
         return full(t, screen)
     if t.last is not None:                               # 1) deja vue : on regarde autour de la derniere fois
@@ -99,3 +112,18 @@ def best(t, screen):
         return full(t, screen)
     t.last = loc if score >= t.thr else None
     return score, loc
+
+
+def find_many(items, screen):
+    """items = [(nom, image), ...] -> {nom: image.find(screen)} dans le MEME ordre, recherches en parallele.
+    Meme resultat qu'une boucle (chaque image n'a que son propre etat, t.last). Une meme image presente deux fois,
+    ou --slow-match / WORKERS = 1 : on reste en sequentiel."""
+    global _POOL
+    items = list(items)
+    if WORKERS <= 1 or len(items) < 2 or len({id(t) for _, t in items}) != len(items):
+        return {k: t.find(screen) for k, t in items}
+    if screen is not None and screen.ndim == 3:
+        screen_cache(screen)                              # prepare UNE fois avant les fils (sinon chacun la recalcule)
+    if _POOL is None:
+        _POOL = ThreadPoolExecutor(WORKERS, thread_name_prefix="fastmatch")
+    return dict(zip((k for k, _ in items), _POOL.map(lambda kt: kt[1].find(screen), items)))

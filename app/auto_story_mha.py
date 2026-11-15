@@ -170,7 +170,6 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("Arrêté.")
+    import journal
+    journal.start("histoire")                 # journal de session dans logs/ (garde les 10 derniers)
+    journal.run(main, stop_msg="Arrêté.")

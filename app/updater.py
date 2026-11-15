@@ -40,7 +40,7 @@ IS_WIN = os.name == "nt"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 NEW_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
 # Jamais ecrases, jamais supprimes, meme si un jour ils se retrouvaient dans le manifeste.
-PROTECTED_NAMES = {"config.json", "discord_config.json", "sequence.json"}
+PROTECTED_NAMES = {"config.json", "discord_config.json", "sequence.json", "planning.json", "profils.json"}
 PROTECTED_DIRS = {"debug", "platform-tools", "__pycache__"}
 
 

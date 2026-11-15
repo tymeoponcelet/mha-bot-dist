@@ -202,4 +202,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import journal
+    journal.start("enchainement")                 # journal de session dans logs/ (garde les 10 derniers)
+    journal.run(main)

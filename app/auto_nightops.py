@@ -32,8 +32,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+import emulateur
 import fastmatch
 import heroes
+import journal
 import nav
 import refill
 import watchdog
@@ -134,6 +136,26 @@ def init_adb():
             print(f"(!) appareil '{DEVICE}' absent, on prend '{devs[0]}'")
         DEVICE = devs[0]
     print(f"ADB : {ADB} | appareil : {DEVICE}")
+    emulateur.remember()               # instance MuMu a relancer si l'emulateur plante (voir emulateur.py)
+
+
+def _find_device():
+    """Pour la reprise (emulateur.py) : appareil visible par ADB (ports connus compris), ou None."""
+    def devs():
+        try:
+            out = subprocess.run([ADB, "devices"], capture_output=True, text=True, timeout=15).stdout.splitlines()[1:]
+        except Exception:
+            return []
+        return [l.split()[0] for l in out if l.strip().endswith("device")]
+    d = devs()
+    if not d:
+        for p in PORTS:
+            try:
+                subprocess.run([ADB, "connect", p], capture_output=True, timeout=6)
+            except Exception:
+                pass
+        d = devs()
+    return DEVICE if DEVICE in d else (d[0] if d else None)
 
 
 def adb(*args, binary=False, timeout=30):
@@ -161,13 +183,14 @@ def _raw_shot():
 
 
 def screenshot():
-    global FAST_SHOT
+    global FAST_SHOT, DEVICE
     err = None
     for i in range(5):
         if FAST_SHOT:
             try:
                 img = _raw_shot()
                 if img is not None:
+                    journal.frame(img)             # boite noire (dernieres captures, en cas d'incident)
                     return img
                 FAST_SHOT = False
                 log("capture rapide non reconnue : retour a la capture PNG (normale)")
@@ -177,10 +200,15 @@ def screenshot():
             png = adb("exec-out", "screencap", "-p", binary=True)
             img = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_COLOR)
             if img is not None:
+                journal.frame(img)
                 return img
         except Exception as e:
             err = e
         time.sleep(2)
+    dev = emulateur.recover(ADB, _find_device, log, why=str(err))     # ADB / MuMu relances, alerte Discord
+    if dev:
+        DEVICE = dev
+        return screenshot()
     raise SystemExit(f"Capture impossible ({err}). L'emulateur est-il toujours connecte ?")
 
 
@@ -201,6 +229,7 @@ class Tpl:
             raise FileNotFoundError(path)
         H, W = full.shape[:2]
         x0, y0, x1, y1 = int(crop[0] * W), int(crop[1] * H), int(crop[2] * W), int(crop[3] * H)
+        self.name = f"{Path(path).parent.name}/{Path(path).name}"     # pour la detection de derive (derive.py)
         self.size, self.off, self.thr, self.mask_white, self.cd, self.tap = (W, H), (x0, y0), thr, mask_white, cd * CD_SCALE, tap
         self.img = self.prep(full[y0:y1, x0:x1])
         fastmatch.prepare(self)                 # versions noir et blanc / demi-echelle (reconnaissance rapide)
@@ -306,6 +335,8 @@ def main():
     awaiting_pick, pick_t = False, 0.0  # "plus" tape : la liste des persos va s'ouvrir
     last_action = time.time()
     RF = make_refill()                  # recharge de stamina par code (option) ; None si desactivee
+    REPRISE = nav.Reprise(nav.Home(screenshot, tap, log, back=lambda: adb("shell", "input", "keyevent", "4")), log)   # ecran inconnu 60 s -> menu + reprise
+    seen_t = time.time()                # derniere fois qu'une image a ete reconnue
     WD = watchdog.make(screenshot, tap, adb, log, Done)     # chien de garde (option) : maintenance / jeu bloque -> relance ; None si desactive
     print(f"Perso : {heroes.pretty(PICK.name)}")
     print(f"Demarrage : {MAX_RUNS} lancement(s). Ctrl+C pour arreter. (conseil : commence depuis le menu principal)")
@@ -335,11 +366,7 @@ def main():
             last_tap = {n: 0.0 for n in SPEC}
             last_action = time.time()
             continue
-        hits = {}
-        for name, t in T.items():
-            h = t.find(screen)
-            if h:
-                hits[name] = h
+        hits = {name: h for name, h in fastmatch.find_many(T.items(), screen).items() if h}   # en parallele, meme resultat
 
         # fin de combat : un ecran de navigation reapparait bien apres le dernier "start"
         if in_battle and now - t_start > BATTLE_END_DELAY and any(n not in BATTLE_ONLY for n in hits):
@@ -424,15 +451,21 @@ def main():
                 h, w = screen.shape[:2]
                 tap_burst(CLICK_POS[0] * w, CLICK_POS[1] * h, CLICK_BURST)
                 continue
+            if hits:
+                seen_t = now
+            if not in_battle and REPRISE.due(now - max(last_action, seen_t)) and REPRISE.run():
+                in_battle, awaiting_pick, max_done, auto_taps = False, False, False, 0     # comme apres le garde-chien
+                PICK.reset()
+                GATE.reset()
+                last_tap = {n: 0.0 for n in SPEC}
+                last_action = seen_t = time.time()
+                continue
             if not in_battle and now - last_action > IDLE_LIMIT and not WD:     # avec le chien de garde, c'est lui qui relance le jeu
                 raise Done(f"Plus rien reconnu depuis {IDLE_LIMIT}s : arret (ecran inattendu, plus de stamina ?).")
             time.sleep(LOOP_DELAY)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Done as e:
-        print(e)
-    except KeyboardInterrupt:
-        print("Arrete.")
+    import journal
+    journal.start("nightops")                 # journal de session dans logs/ (garde les 10 derniers)
+    journal.run(main, Done)               # meme affichage qu'avant + incident (capture, boite noire) si arret anormal

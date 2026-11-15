@@ -18,8 +18,9 @@ from pathlib import Path
 try:                                    # l'assistant (sans opencv) peut quand meme importer la liste des persos
     import cv2
     import numpy as np
+    import fastmatch                    # reconnaissance rapide (meme score, ~10x plus vite)
 except ImportError:                     # pragma: no cover
-    cv2 = np = None
+    cv2 = np = fastmatch = None
 
 BASE = Path(__file__).resolve().parent
 CHAR_DIR = BASE / "templates_chars"
@@ -90,6 +91,7 @@ class _Row:
             raise FileNotFoundError(f"{Path(path).parent.name}/{Path(path).name}")
         H, W = full.shape[:2]
         self.size = (W, H)
+        self.name = f"{Path(path).parent.name}/{Path(path).name}"     # pour la detection de derive (derive.py)
         self.x0, self.y0 = int(CROP[0] * W), int(CROP[1] * H)
         self.img = full[self.y0:int(CROP[3] * H), self.x0:int(CROP[2] * W)]
         self.btn_box = self._deploy_box(full)            # (x, y, w, h) du bouton Deploy dans l'image de la ligne
@@ -97,6 +99,8 @@ class _Row:
         self.deploy = (bx + bw / 2, by + bh / 2)         # point de tap, en pixels de l'image de la ligne
         m = 4                                            # marge : on ne garde que le coeur du bouton
         self.btn_img = full[by + m:by + bh - m, bx + m:bx + bw - m]
+        self.thr = THR                                   # pour fastmatch : verification en couleur exacte autour du seuil
+        fastmatch.prepare(self)
 
     @staticmethod
     def _deploy_box(full):
@@ -112,12 +116,12 @@ class _Row:
                 return x, y, w, h
         return int(0.69 * W), int(0.36 * H), int(0.28 * W), int(0.33 * H)    # repli : position habituelle
 
+    def prep(self, img):                                 # nom attendu par fastmatch (comparaison couleur directe)
+        return img
+
     def best(self, screen):
-        if screen.shape[0] < self.img.shape[0] or screen.shape[1] < self.img.shape[1]:
-            return 0.0, (0, 0)
-        res = cv2.matchTemplate(screen, self.img, cv2.TM_CCOEFF_NORMED)
-        _, score, _, loc = cv2.minMaxLoc(res)
-        return (0.0 if np.isnan(score) else float(score)), loc
+        """Meme score que la comparaison couleur sur toute la capture (fastmatch ; --slow-match pour l'ancienne)."""
+        return fastmatch.best(self, screen)
 
     def top_left(self, loc):
         """Coin haut-gauche de la ligne complete a l'ecran, d'apres la position trouvee du portrait."""

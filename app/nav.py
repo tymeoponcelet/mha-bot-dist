@@ -45,6 +45,7 @@ class _T:
         full = cv2.imread(str(path), cv2.IMREAD_COLOR) if path and Path(path).exists() else None
         self.ok = full is not None
         self.thr = thr
+        self.name = f"{Path(path).parent.name}/{Path(path).name}" if path else None    # derive.py
         self.img = None
         if self.ok:
             H, W = full.shape[:2]
@@ -230,6 +231,41 @@ class Home:
         except Exception:
             pass
         return False
+
+
+class Reprise:
+    """Ecran inconnu : apres IDLE s sans action ET sans aucune image reconnue (hors combat) ->
+    capture (incident, envoye sur Discord) + retour au menu principal ; le mode repart de zero, comme apres le garde-chien.
+    Au plus MAX reprises par WINDOW s : au-dela, run() renvoie False et l'arret d'origine (IDLE_LIMIT) reprend la main."""
+    IDLE = 60
+    MAX = 3
+    WINDOW = 1800
+
+    def __init__(self, home, log):
+        self.home, self.log, self.times = home, log, []
+
+    def due(self, idle_s):
+        return idle_s > self.IDLE
+
+    def run(self, why="aucune image reconnue"):
+        """-> True si une reprise a ete faite (le mode doit remettre son etat a zero et continuer)."""
+        now = time.time()
+        self.times = [t for t in self.times if now - t < self.WINDOW]
+        if len(self.times) >= self.MAX:
+            return False
+        self.times.append(now)
+        n = len(self.times)
+        try:
+            import journal
+            journal.incident(f"Écran inconnu depuis {self.IDLE}s ({why}) : retour au menu principal et reprise "
+                             f"({n}/{self.MAX} en {self.WINDOW // 60} min)", live=True, kind="reprise")
+        except Exception:
+            pass
+        self.log(f"=== ECRAN INCONNU depuis {self.IDLE}s : retour au menu principal, puis reprise ({n}/{self.MAX}) ===")
+        ok = self.home.go()
+        if not ok:
+            self.log("(!) menu principal non atteint : le mode reessaie quand meme")
+        return True
 
 
 def run_test(shot):

@@ -585,6 +585,8 @@ def main():
     nt.init_adb()
     if "--no-home" not in sys.argv:
         nav.Home(nt.screenshot, nt.tap, log, back=lambda: nt.adb("shell", "input", "keyevent", "4")).go()
+    REPRISE = nav.Reprise(nav.Home(nt.screenshot, nt.tap, log, back=lambda: nt.adb("shell", "input", "keyevent", "4")), log)   # ecran inconnu 60 s -> menu + reprise
+    seen_t = time.time()                # derniere fois qu'une image a ete reconnue
     WD = watchdog.make(nt.screenshot, nt.tap, nt.adb, log, Done)
     last = {n: 0.0 for n in SPEC}
     runs, auto_taps = 0, 0
@@ -617,11 +619,7 @@ def main():
             in_battle, bots_done, char_done, flipped, resetting, deploy_tries = False, False, False, False, False, 0
             last_action = time.time()
             continue
-        hits = {}
-        for key, t in T.items():
-            h = t.find(screen)
-            if h:
-                hits[key] = h
+        hits = {key: h for key, h in fastmatch.find_many(T.items(), screen).items() if h}     # en parallele, meme resultat
         if "bots" in hits:
             BOTS_POS[0] = hits["bots"][:2]
             if bots_grey(screen):
@@ -823,6 +821,12 @@ def main():
                 best = sorted(((round(float(t.best_exact(screen)[0]), 2), k) for k, t in T.items()), reverse=True)[:4]
                 log("(!) aucun bouton reconnu sur cet ecran. Meilleurs scores : " + ", ".join(f"{k} {v}" for v, k in best))
                 debug_shot("rien", screen)
+            if hits:
+                seen_t = now
+            if not in_battle and REPRISE.due(now - max(last_action, seen_t)) and REPRISE.run():
+                in_battle, bots_done, char_done, flipped, resetting, deploy_tries = False, False, False, False, False, 0
+                last_action = seen_t = time.time()                  # comme apres le garde-chien
+                continue
             if now - last_action > nt.IDLE_LIMIT and not WD:
                 debug_shot("bloque", screen)
                 raise Done(f"Plus rien reconnu depuis {nt.IDLE_LIMIT}s : arret. Regarde debug/ et lance 'python auto_aa.py --test' "
@@ -831,9 +835,6 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Done as e:
-        print(e)
-    except KeyboardInterrupt:
-        print("Arrete.")
+    import journal
+    journal.start("aa")                 # journal de session dans logs/ (garde les 10 derniers)
+    journal.run(main, Done)               # meme affichage qu'avant + incident (capture, boite noire) si arret anormal

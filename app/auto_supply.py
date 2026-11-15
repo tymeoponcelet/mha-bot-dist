@@ -29,6 +29,7 @@ import cv2
 import numpy as np
 
 import auto_nightops as nt
+import fastmatch
 import heroes
 import nav
 import watchdog
@@ -312,6 +313,8 @@ def main():
     awaiting_pick, pick_t = False, 0.0        # "plus" tape : la liste des persos va s'ouvrir
     last_action = time.time()
     RF = nt.make_refill()                     # recharge de stamina par code (option) ; None si desactivee
+    REPRISE = nav.Reprise(nav.Home(nt.screenshot, nt.tap, log, back=lambda: nt.adb("shell", "input", "keyevent", "4")), log)   # ecran inconnu 60 s -> menu + reprise
+    seen_t = time.time()                # derniere fois qu'une image a ete reconnue
     WD = watchdog.make(nt.screenshot, nt.tap, nt.adb, log, Done)   # chien de garde (option) ; None si desactive
     print(f"Perso : {heroes.pretty(PICK.name)}")
     print(f"Supply :{MODES[MODE]} (niveau {LEVEL}) | {MAX_RUNS} lancement(s) de multi-run. Ctrl+C pour arreter. "
@@ -376,13 +379,17 @@ def main():
         if in_battle and now - t_start > nt.BATTLE_END_DELAY and NAV_KEYS:
             rr_key = NAV_KEYS[rr % len(NAV_KEYS)]
             rr += 1
-        hits = {}
+        need = []
         for key, t in T.items():
             if not full and key not in BATTLE_ONLY and key != rr_key:
                 continue
             if panel_prev and key in BEHIND_KEYS:
                 continue                         # panneau de l'equipe ouvert : inutile de chercher l'ecran qui est derriere (gain ~1 s / tour)
-            h = fast_seen[key] if key in fast_seen else t.find(screen)
+            need.append(key)
+        found = fastmatch.find_many([(k, T[k]) for k in need if k not in fast_seen], screen)   # en parallele, meme resultat
+        hits = {}
+        for key in need:
+            h = fast_seen[key] if key in fast_seen else found[key]
             if h:
                 hits[key] = h
 
@@ -510,15 +517,21 @@ def main():
             h, w = screen.shape[:2]
             nt.tap_burst(nt.CLICK_POS[0] * w, nt.CLICK_POS[1] * h, BURST)
             continue
+        if hits:
+            seen_t = now
+        if not in_battle and REPRISE.due(now - max(last_action, seen_t)) and REPRISE.run():
+            in_battle, awaiting_pick, max_done, auto_taps, nav_taps, panel_prev = False, False, False, 0, 0, False
+            PICK.reset()
+            GATE.reset()
+            last_tap = {n: 0.0 for n in SPEC}
+            last_action = seen_t = time.time()
+            continue
         if not in_battle and now - last_action > nt.IDLE_LIMIT and not WD:
             raise Done(f"Plus rien reconnu depuis {nt.IDLE_LIMIT}s : arret (ecran inattendu, plus de stamina ?).")
         time.sleep(nt.LOOP_DELAY)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Done as e:
-        print(e)
-    except KeyboardInterrupt:
-        print("Arrete.")
+    import journal
+    journal.start("supply")                 # journal de session dans logs/ (garde les 10 derniers)
+    journal.run(main, Done)               # meme affichage qu'avant + incident (capture, boite noire) si arret anormal

@@ -25,6 +25,10 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import enchainer as ec          # plan d'enchainement (syntaxe des etapes)
+import verif                   # verification de l'installation (lecture seule)
+import stats                   # historique des farms (logs/runs.jsonl)
+import planificateur as pl     # farms programmes (planning.json + Planificateur de taches Windows)
+import profils                 # profils de configuration (profils.json)
 import heroes as hz            # liste / noms des persos (templates_chars/) ; n'a pas besoin d'opencv ici
 
 BASE = Path(__file__).resolve().parent
@@ -199,6 +203,7 @@ class App(tk.Tk):
         self.build_ui()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.refresh_all()
+        self.after(600, self.run_verif)                          # verification automatique a l'ouverture
 
     # ================= interface =================
     def setup_style(self):
@@ -242,6 +247,9 @@ class App(tk.Tk):
         self.auto_btn = Btn(head, "⚡ Tout configurer automatiquement", self.auto_setup,
                             bg=BLUE, size=10, padx=14, pady=8)
         self.auto_btn.pack(side="right", pady=(6, 0))
+        Btn(head, "📊 Stats", self.open_stats, bg=GREY, fg=TEXT, size=10, padx=12, pady=8).pack(side="right", padx=(0, 8), pady=(6, 0))
+        Btn(head, "🗓️ Planning", self.open_planning, bg=GREY, fg=TEXT, size=10, padx=12, pady=8).pack(side="right", padx=(0, 8), pady=(6, 0))
+        Btn(head, "👤 Profils", self.open_profiles, bg=GREY, fg=TEXT, size=10, padx=12, pady=8).pack(side="right", padx=(0, 8), pady=(6, 0))
 
         prog = tk.Frame(self.body, bg=BG)
         prog.pack(fill="x", padx=18, pady=(0, 6))
@@ -277,6 +285,22 @@ class App(tk.Tk):
         self.combo = ttk.Combobox(r2, width=18, state="readonly")
         self.combo.pack(side="left")
         Btn(r2, "✔", self.use_device, bg=GREEN, padx=8, pady=2).pack(side="left", padx=(4, 0))
+
+        # --- verification de l'installation (lecture seule, ne bloque rien) ---
+        vf = tk.Frame(self.body, bg=CARD, highlightthickness=2, highlightbackground=BORDER)
+        vf.pack(fill="x", padx=16, pady=4)
+        vtop = tk.Frame(vf, bg=CARD)
+        vtop.pack(fill="x", padx=12, pady=(8, 2))
+        tk.Label(vtop, text="🩺 Vérification", bg=CARD, fg=TEXT, font=F(12, True)).pack(side="left")
+        self.verif_when = tk.Label(vtop, text="", bg=CARD, fg=MUTED, font=F(8))
+        self.verif_when.pack(side="left", padx=(10, 0))
+        Btn(vtop, "🔄 Vérifier", self.run_verif, bg=GREY, fg=TEXT, size=9, padx=10, pady=3).pack(side="right")
+        self.verif_lbls = {}
+        for key in ("device", "resolution", "game", "foreground", "discord"):
+            lb = tk.Label(vf, text="…", bg=CARD, fg=MUTED, font=F(9), anchor="w", justify="left", wraplength=780)
+            lb.pack(fill="x", padx=14)
+            self.verif_lbls[key] = lb
+        tk.Frame(vf, bg=CARD, height=6).pack()
 
         # --- panneau de lancement ---
         pan = tk.Frame(self.body, bg=CARD, highlightthickness=2, highlightbackground=YELLOW)
@@ -1091,6 +1115,228 @@ class App(tk.Tk):
             else:
                 self.launch_btn.style(GREY, TEXT)
                 self.action_lbl.config(text="Prêt quand toutes les étapes sont vertes.", fg=MUTED)
+
+    def open_stats(self):
+        """Fenetre des statistiques : aujourd'hui / 7 jours / tout, detail par mode (7 j), dernieres sessions."""
+        win = tk.Toplevel(self)
+        win.title("MHA Bot - statistiques")
+        win.configure(bg=BG)
+        win.geometry("880x640")
+        tk.Label(win, text="📊 Statistiques des farms", bg=BG, fg=YELLOW, font=F(16, True)).pack(anchor="w", padx=16, pady=(12, 6))
+        tiles = tk.Frame(win, bg=BG)
+        tiles.pack(fill="x", padx=12)
+        for days, title in ((1, "Dernières 24 h"), (7, "7 derniers jours"), (0, "Depuis le début")):
+            t = stats.summary(days)["total"]
+            f = tk.Frame(tiles, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
+            f.pack(side="left", fill="both", expand=True, padx=4)
+            tk.Label(f, text=title, bg=CARD, fg=MUTED, font=F(9, True)).pack(anchor="w", padx=10, pady=(8, 0))
+            tk.Label(f, text=f"{t['runs']} runs", bg=CARD, fg=TEXT, font=("Segoe UI Black", 20)).pack(anchor="w", padx=10)
+            tk.Label(f, text=f"{t['sessions']} session(s) · {stats.hms(t['duree'])} de farm\n{t['reussite']} % finies · "
+                     f"{t['recharges']} recharge(s) · {t['relances']} relance(s)", bg=CARD, fg=MUTED, font=F(9),
+                     justify="left").pack(anchor="w", padx=10, pady=(0, 8))
+        tk.Label(win, text="Par mode (7 derniers jours)", bg=BG, fg=TEXT, font=F(11, True)).pack(anchor="w", padx=16, pady=(12, 2))
+        tab = tk.Frame(win, bg=CARD)
+        tab.pack(fill="x", padx=16)
+        modes = stats.summary(7)["modes"]
+        for c, h in enumerate(("Mode", "Sessions", "Runs", "Temps", "Finies", "Recharges", "Relances", "Reprises")):
+            tk.Label(tab, text=h, bg=CARD, fg=MUTED, font=F(9, True)).grid(row=0, column=c, sticky="w", padx=8, pady=(6, 2))
+        for r, (m, a) in enumerate(modes.items(), start=1):
+            vals = (m, a["sessions"], a["runs"], stats.hms(a["duree"]), f"{a['reussite']} %", a["recharges"], a["relances"], a["reprises"])
+            for c, v in enumerate(vals):
+                tk.Label(tab, text=str(v), bg=CARD, fg=TEXT, font=F(9)).grid(row=r, column=c, sticky="w", padx=8, pady=1)
+        if not modes:
+            tk.Label(tab, text="Aucun farm ces 7 derniers jours.", bg=CARD, fg=MUTED, font=F(9)).grid(row=1, column=0, columnspan=8,
+                                                                                                    sticky="w", padx=8, pady=4)
+        tk.Label(win, text="Dernières sessions", bg=BG, fg=TEXT, font=F(11, True)).pack(anchor="w", padx=16, pady=(12, 2))
+        hist = tk.Frame(win, bg=CARD)
+        hist.pack(fill="both", expand=True, padx=16, pady=(0, 12))
+        last = stats.summary(0)["dernieres"]
+        for s in last:
+            tk.Label(hist, text=stats.describe(s), bg=CARD, fg=TEXT, font=F(9), anchor="w").pack(fill="x", padx=8)
+        if not last:
+            tk.Label(hist, text="L'historique se remplit tout seul à chaque farm (logs/runs.jsonl).", bg=CARD, fg=MUTED,
+                     font=F(9)).pack(anchor="w", padx=8, pady=4)
+        return win
+
+    def open_profiles(self):
+        """Profils : enregistrer les reglages actuels sous un nom, en recharger un (l'assistant se relance), supprimer."""
+        win = tk.Toplevel(self)
+        win.title("MHA Bot - profils")
+        win.configure(bg=BG)
+        win.geometry("760x480")
+        tk.Label(win, text="👤 Profils", bg=BG, fg=YELLOW, font=F(16, True)).pack(anchor="w", padx=16, pady=(12, 0))
+        tk.Label(win, text="Un profil garde tes réglages de farm (mode, persos, niveaux, runs, recharge, garde-chien). "
+                 "Jamais ceux du PC (ADB, émulateur).", bg=BG, fg=MUTED, font=F(9), wraplength=720,
+                 justify="left").pack(anchor="w", padx=16, pady=(0, 8))
+        lst = tk.Frame(win, bg=CARD)
+        lst.pack(fill="x", padx=16)
+        status = tk.Label(win, text="", bg=BG, fg=MUTED, font=F(9), anchor="w", justify="left", wraplength=720)
+
+        def refresh():
+            for w in lst.winfo_children():
+                w.destroy()
+            data = profils.load()
+            for n, p in data.items():
+                row = tk.Frame(lst, bg=CARD)
+                row.pack(fill="x", padx=8, pady=2)
+                tk.Label(row, text=n, bg=CARD, fg=TEXT, font=F(10, True), width=18, anchor="w").pack(side="left")
+                tk.Label(row, text=profils.summary(p), bg=CARD, fg=MUTED, font=F(9), anchor="w").pack(side="left")
+                Btn(row, "🗑", lambda n=n: delete(n), bg=GREY, fg=TEXT, size=9, padx=8, pady=1).pack(side="right")
+                Btn(row, "Charger", lambda n=n: use(n), bg=YELLOW, size=9, padx=10, pady=1).pack(side="right", padx=(0, 4))
+            if not data:
+                tk.Label(lst, text="Aucun profil pour l'instant.", bg=CARD, fg=MUTED, font=F(9)).pack(anchor="w", padx=8, pady=6)
+
+        def delete(n):
+            profils.delete(n)
+            status.config(text=f"profil « {n} » supprimé", fg=MUTED)
+            refresh()
+
+        def use(n):
+            if self.proc:
+                status.config(text="❌ Un farm tourne : arrête-le avant de changer de profil.", fg=RED)
+                return
+            self.cfg = profils.apply(n, self.cfg)
+            save_cfg(self.cfg)
+            status.config(text=f"✅ profil « {n} » chargé : l'assistant se relance…", fg=GREEN)
+            self.after(700, self.restart)
+
+        form = tk.Frame(win, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
+        form.pack(fill="x", padx=16, pady=(14, 4))
+        tk.Label(form, text="Enregistrer les réglages actuels sous le nom", bg=CARD, fg=TEXT, font=F(10, True)).pack(side="left", padx=10, pady=10)
+        name = tk.Entry(form, width=24, font=F(11))
+        name.pack(side="left", padx=(0, 8))
+
+        def save():
+            try:
+                n = profils.save(name.get(), self.cfg)
+                status.config(text=f"✅ profil « {n} » enregistré ({profils.summary(profils.load()[n])})", fg=GREEN)
+                name.delete(0, "end")
+            except ValueError as e:
+                status.config(text=f"❌ {e}", fg=RED)
+            refresh()
+        Btn(form, "💾 Enregistrer", save, bg=YELLOW, padx=12, pady=4).pack(side="left")
+        status.pack(fill="x", padx=16, pady=(4, 0))
+        refresh()
+        win.profils_ui = {"name": name, "save": save, "use": use, "delete": delete, "list": lst, "status": status}
+        return win
+
+    def restart(self):
+        """Relance l'assistant (apres chargement d'un profil : tous les ecrans relisent config.json)."""
+        exe = Path(sys.executable)
+        pyw = exe.with_name("pythonw.exe")
+        subprocess.Popen([str(pyw if pyw.exists() else exe), str(BASE / "setup_assistant.py")], cwd=str(BASE))
+        self.destroy()
+
+    def open_planning(self):
+        """Fenetre des farms programmes : liste (prochaine execution, suppression) + ajout d'un creneau."""
+        win = tk.Toplevel(self)
+        win.title("MHA Bot - planning")
+        win.configure(bg=BG)
+        win.geometry("860x560")
+        tk.Label(win, text="🗓️ Farms programmés", bg=BG, fg=YELLOW, font=F(16, True)).pack(anchor="w", padx=16, pady=(12, 0))
+        tk.Label(win, text="Le PC peut être en veille (il se réveille tout seul), pas éteint. Si un farm tourne déjà à l'heure "
+                 "prévue, le créneau est sauté. Notification sur Discord à la fin.", bg=BG, fg=MUTED, font=F(9),
+                 wraplength=820, justify="left").pack(anchor="w", padx=16, pady=(0, 8))
+        lst = tk.Frame(win, bg=CARD)
+        lst.pack(fill="x", padx=16)
+        status = tk.Label(win, text="", bg=BG, fg=MUTED, font=F(9), anchor="w", justify="left", wraplength=820)
+
+        gen = [0]                                            # seul le dernier rafraichissement s'affiche
+
+        def refresh():
+            gen[0] += 1
+            me = gen[0]
+            for w in lst.winfo_children():
+                w.destroy()
+            tk.Label(lst, text="… lecture du Planificateur Windows", bg=CARD, fg=MUTED, font=F(9)).pack(anchor="w", padx=8, pady=6)
+
+            def work():
+                nxt = pl.next_runs()
+                items = pl.load()                            # relu APRES : jamais une liste perimee
+                self.after(0, lambda: show(items, nxt) if me == gen[0] else None)
+            threading.Thread(target=work, daemon=True).start()
+
+        def show(items, nxt):
+            for w in lst.winfo_children():
+                w.destroy()
+            for it in items:
+                row = tk.Frame(lst, bg=CARD)
+                row.pack(fill="x", padx=8, pady=2)
+                tk.Label(row, text=pl.describe(it) + f"   ·   prochaine : {nxt.get(it['id'], '⚠️ tâche absente')}", bg=CARD,
+                         fg=TEXT, font=F(9), anchor="w").pack(side="left")
+                Btn(row, "🗑", lambda i=it["id"]: delete(i), bg=GREY, fg=TEXT, size=9, padx=8, pady=1).pack(side="right")
+            if not items:
+                tk.Label(lst, text="Aucun farm programmé.", bg=CARD, fg=MUTED, font=F(9)).pack(anchor="w", padx=8, pady=6)
+
+        def delete(i):
+            def work():
+                pl.remove(i)
+                self.after(0, refresh)
+            status.config(text=f"suppression du créneau #{i}…", fg=MUTED)
+            threading.Thread(target=work, daemon=True).start()
+
+        form = tk.Frame(win, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
+        form.pack(fill="x", padx=16, pady=(14, 4))
+        tk.Label(form, text="Ajouter un créneau", bg=CARD, fg=TEXT, font=F(11, True)).grid(row=0, column=0, columnspan=4,
+                                                                                         sticky="w", padx=10, pady=(8, 4))
+        tk.Label(form, text="Heure", bg=CARD, fg=MUTED, font=F(9, True)).grid(row=1, column=0, sticky="w", padx=10)
+        heure = tk.Entry(form, width=8, font=F(11))
+        heure.insert(0, "02:00")
+        heure.grid(row=2, column=0, sticky="w", padx=10, pady=(0, 8))
+        tk.Label(form, text="Quand", bg=CARD, fg=MUTED, font=F(9, True)).grid(row=1, column=1, sticky="w", padx=10)
+        jours = ttk.Combobox(form, width=22, state="readonly", values=list(pl.JOURS.values()))
+        jours.current(0)
+        jours.grid(row=2, column=1, sticky="w", padx=10, pady=(0, 8))
+        tk.Label(form, text="Séquence (comme l'enchaînement, ex. supply:money:4:10 nightops:5)", bg=CARD, fg=MUTED,
+                 font=F(9, True)).grid(row=1, column=2, sticky="w", padx=10)
+        seq = tk.Entry(form, width=48, font=F(11))
+        try:
+            seq.insert(0, " ".join(self.step_token(st) for st in self.chain_steps))   # l'enchainement deja compose
+        except Exception:                                    # noqa: BLE001
+            pass
+        seq.grid(row=2, column=2, sticky="we", padx=10, pady=(0, 8))
+
+        def add():
+            code = list(pl.JOURS)[jours.current()]
+            status.config(text="ajout dans le Planificateur Windows…", fg=MUTED)
+
+            def work():
+                try:
+                    it, _m = pl.add(heure.get(), code, seq.get())
+                    msg, col = f"✅ créneau #{it['id']} ajouté : {pl.describe(it)}", GREEN
+                except ValueError as e:
+                    msg, col = f"❌ {e}", RED
+                self.after(0, lambda: (status.config(text=msg, fg=col), refresh()))
+            threading.Thread(target=work, daemon=True).start()
+        Btn(form, "➕ Ajouter", add, bg=YELLOW, padx=14, pady=4).grid(row=2, column=3, sticky="e", padx=10, pady=(0, 8))
+        status.pack(fill="x", padx=16, pady=(4, 0))
+        refresh()
+        win.planning_ui = {"heure": heure, "jours": jours, "seq": seq, "add": add, "status": status, "list": lst}
+        return win
+
+    def run_verif(self):
+        """Verifications de verif.py en arriere-plan, puis affichage (✅ / ⚠️ / ❌ + conseil)."""
+        for lb in self.verif_lbls.values():
+            lb.config(text="… vérification", fg=MUTED)
+
+        def work():
+            try:
+                res = verif.run_all(self.adb_path(), self.cfg.get("device"))
+            except Exception as e:                       # noqa: BLE001
+                res = [("device", "bad", f"vérification impossible ({e})", "")]
+            self.after(0, lambda: self.show_verif(res))
+        threading.Thread(target=work, daemon=True).start()
+
+    def show_verif(self, res):
+        icon = {"ok": ("✅", GREEN), "warn": ("⚠️", YELLOW), "bad": ("❌", RED)}
+        for key, st, txt, tip in res:
+            if key in self.verif_lbls:
+                i, col = icon[st]
+                self.verif_lbls[key].config(text=f"{i}  {txt}" + (f"   →  {tip}" if tip else ""), fg=col if st != "ok" else TEXT)
+        self.verif_when.config(text="vérifié à " + time.strftime("%H:%M:%S"))
+        bad = [txt for _k, st, txt, _t in res if st == "bad"]
+        if bad:
+            self.log("🩺 À corriger : " + " ; ".join(bad), RED)
 
     def problems(self):
         names = {"deps": "modules Python (étape 1)", "adb": "ADB (étape 2)",

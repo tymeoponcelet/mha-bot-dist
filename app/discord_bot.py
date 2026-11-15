@@ -176,7 +176,8 @@ class Runner:
             self.lines.clear()
             self.label, self.emoji, self.t0, self.stopped = label, emoji, time.time(), False
             self.proc = subprocess.Popen(cmd, cwd=BASE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                                         encoding="utf-8", errors="replace", env=ENV, creationflags=NO_WINDOW)
+                                         encoding="utf-8", errors="replace", env=dict(ENV, MHA_DISCORD="1"),
+                                         creationflags=NO_WINDOW)
             threading.Thread(target=self._read, args=(self.proc, on_end), daemon=True).start()
 
     def _read(self, proc, on_end):
@@ -266,6 +267,118 @@ def embed(title, desc="", color=COLORS["info"], tip=None):
     return e
 
 
+async def send_owner(e, files=()):
+    """Envoie un message dans le salon des resultats (s'il est regle), sinon en prive au proprietaire."""
+    def fl():
+        return [discord.File(str(f), filename=f.name) for f in files]
+    if CHANNEL_ID:                                       # annonce dans un salon : tout le monde la voit
+        try:
+            ch = client.get_channel(CHANNEL_ID) or await client.fetch_channel(CHANNEL_ID)
+            await ch.send(embed=e, files=fl())
+            return
+        except Exception as ex:
+            print(f"(!) Salon {CHANNEL_ID} inaccessible ({ex}) : j'envoie un message privé à la place.")
+    for uid in sorted(ALLOWED)[:1]:
+        try:
+            user = await client.fetch_user(uid)
+            await user.send(embed=e, files=fl())
+        except Exception as ex:
+            print("Message privé impossible :", ex)
+
+
+# ---------------------------------------------------------------- incidents (journal.py : logs/incidents/)
+INC_DIR = BASE / "logs" / "incidents"
+INC_POLL = 15                                            # s entre deux verifications du dossier
+BOT_T0 = time.time()
+
+
+def incidents(pending_only=True):
+    """-> [(dossier, infos)] des incidents pas encore envoyes, du plus ancien au plus recent."""
+    out = []
+    try:
+        for d in sorted(INC_DIR.glob("2*")):
+            if pending_only and (d / "envoye").exists():
+                continue
+            try:
+                out.append((d, json.loads((d / "incident.json").read_text(encoding="utf-8"))))
+            except (OSError, ValueError):
+                pass
+    except OSError:
+        pass
+    return out
+
+
+def mark_sent(d):
+    try:
+        (d / "envoye").write_text(time.strftime("%Y-%m-%d %H:%M:%S"), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def incident_files(d):
+    return [f for f in (d / "capture.png", d / "boite_noire.jpg") if f.exists()]
+
+
+def incident_tail(d, n=10):
+    try:
+        txt = "\n".join((d / "fin_journal.txt").read_text(encoding="utf-8").splitlines()[-n:])
+    except OSError:
+        txt = ""
+    return (txt[-1000:] or "(vide)").replace("`", "'")
+
+
+INCIDENT_TITLES = {"planning": "🗓️ Farm programmé", "derive": "📉 Image qui se dégrade", "reprise": "🔄 Écran inconnu : reprise", "adb": "📵 ADB / émulateur",
+                   "incident": "🚨 Script bloqué"}
+
+
+async def send_incident(d, info):
+    live = info.get("live")
+    title = INCIDENT_TITLES.get(info.get("kind"), "🚨 Script bloqué") if live else "🚨 Incident"
+    e = embed(f"{title} : {info.get('script') or 'script'}",
+              f"**{info.get('reason', '?')[:900]}**\n🕒 {info.get('time', '')}", COLORS["bad"],
+              tip="Pièces jointes : dernière capture + boîte noire (30 dernières captures) · /capture pour l'écran actuel")
+    e.add_field(name="10 dernières lignes du journal", value=f"```\n{incident_tail(d)}\n```", inline=False)
+    files = incident_files(d)
+    if any(f.name == "capture.png" for f in files):
+        e.set_image(url="attachment://capture.png")
+    await send_owner(e, files)
+    mark_sent(d)
+
+
+async def incident_check():
+    """Un passage : envoie les incidents des scripts lances hors Discord (assistant...) et les blocages en direct.
+    Ceux des scripts lances par Discord partent avec le message de fin (notify)."""
+    for d, info in incidents():
+        mtime = d.stat().st_mtime
+        if mtime < BOT_T0 - 3600:                       # vieux incidents d'avant le demarrage du bot : on ne spamme pas
+            mark_sent(d)
+            continue
+        if info.get("discord_session") and not info.get("live") and time.time() - mtime < 120:
+            continue                                    # notify() s'en charge a la fin du script
+        await send_incident(d, info)
+
+
+ALIVE = BASE / "logs" / "discord_bot.vivant"            # l'assistant y voit que le bot est en ligne (verif.py)
+
+
+def alive():
+    try:
+        ALIVE.parent.mkdir(parents=True, exist_ok=True)
+        ALIVE.write_text(time.strftime("%Y-%m-%d %H:%M:%S"), encoding="utf-8")
+    except OSError:
+        pass
+
+
+async def incident_watch():
+    while True:
+        alive()
+        await asyncio.sleep(INC_POLL)
+        try:
+            await incident_check()
+        except Exception as ex:                         # noqa: BLE001 - la surveillance ne doit jamais s'arreter
+            print(f"(!) envoi d'incident impossible : {ex!r}", flush=True)
+
+
 async def notify(code, stopped):
     """Message prive a la fin d'un script (pas quand tu l'as arrete toi-meme avec /stop)."""
     if stopped:
@@ -278,19 +391,18 @@ async def notify(code, stopped):
               f"Durée : **{runner.elapsed()}**", COLORS["info"] if ok else COLORS["bad"],
               tip="/statut pour les détails · /capture pour voir l'écran")
     e.add_field(name="Dernières lignes", value=f"```\n{text}\n```", inline=False)
-    if CHANNEL_ID:                                       # annonce dans un salon : tout le monde la voit
-        try:
-            ch = client.get_channel(CHANNEL_ID) or await client.fetch_channel(CHANNEL_ID)
-            await ch.send(embed=e)
-            return
-        except Exception as ex:
-            print(f"(!) Salon {CHANNEL_ID} inaccessible ({ex}) : j'envoie un message privé à la place.")
-    for uid in sorted(ALLOWED)[:1]:
-        try:
-            user = await client.fetch_user(uid)
-            await user.send(embed=e)
-        except Exception as ex:
-            print("Message privé impossible :", ex)
+    files = []
+    mine = [(d, i) for d, i in incidents() if i.get("discord_session") and not i.get("live")
+            and d.stat().st_mtime >= runner.t0 - 5]
+    if mine:                                             # incident(s) de ce lancement : raison + capture + boite noire
+        d, info = mine[-1]
+        e.add_field(name="🚨 Incident", value=info.get("reason", "?")[:1000], inline=False)
+        files = incident_files(d)
+        if any(f.name == "capture.png" for f in files):
+            e.set_image(url="attachment://capture.png")
+    await send_owner(e, files)
+    for d, _i in mine:
+        mark_sent(d)
 
 
 def on_end(code, stopped):
@@ -333,7 +445,10 @@ async def start_script(interaction, command, label, replace, kind="supply", deta
 @client.event
 async def on_ready():
     global LOOP
+    first = LOOP is None
     LOOP = asyncio.get_running_loop()
+    if first:
+        LOOP.create_task(incident_watch())                # incidents (logs/incidents) -> Discord
     if SYNC:
         try:
             await (tree.sync(guild=GUILD) if GUILD else tree.sync())
@@ -652,6 +767,9 @@ async def stop_cmd(interaction: discord.Interaction):
     if runner.stop():
         await interaction.response.send_message(embed=embed("⏹ Script arrêté", f"{emo} **{label}**", COLORS["bad"],
                                                             tip="Le jeu reste où il en est : relance quand tu veux."), ephemeral=EPH)
+    elif await asyncio.to_thread(__import__("planificateur").stop_planned):     # farm lance par le planning
+        await interaction.response.send_message(embed=embed("⏹ Farm programmé arrêté", "🗓️ lancé par le planning",
+                                                            COLORS["bad"], tip="/planning pour voir les créneaux"), ephemeral=EPH)
     else:
         await interaction.response.send_message(embed=embed("Rien à arrêter", "Aucun script ne tourne en ce moment.", COLORS["info"],
                                                             tip="/supply · /nightops · /herotrial pour en lancer un"), ephemeral=EPH)
@@ -695,6 +813,69 @@ async def capture_cmd(interaction: discord.Interaction):
     await interaction.followup.send(file=discord.File(io.BytesIO(png), filename="capture.png"))
 
 
+# ---------------------------------------------------------------- /planifier /planning
+PLAN_JOURS = [app_commands.Choice(name="Tous les jours", value="tous"),
+              app_commands.Choice(name="Du lundi au vendredi", value="semaine"),
+              app_commands.Choice(name="Le week-end", value="weekend"),
+              app_commands.Choice(name="Une seule fois (prochaine fois que cette heure arrive)", value="une_fois")]
+
+
+@cmd(name="planifier", description="🗓️ Programme un farm à une heure fixe (le PC doit rester allumé)")
+@app_commands.describe(heure="Heure, ex. 02:00 ou 7h30", sequence="Étapes comme /enchainer, ex. supply:money:4:10 nightops:5",
+                       jours="Quand le répéter")
+@app_commands.choices(jours=PLAN_JOURS)
+async def planifier_cmd(interaction: discord.Interaction, heure: str, sequence: str, jours: str = "tous"):
+    await interaction.response.defer(ephemeral=EPH)
+    import planificateur as pl
+    try:
+        it, _m = await asyncio.to_thread(pl.add, heure, jours, sequence)
+    except ValueError as e:
+        await interaction.followup.send(embed=embed("❌ Créneau refusé", str(e)[:1500], COLORS["bad"],
+                                                    tip="Syntaxe des étapes : comme /enchainer"))
+        return
+    nxt = (await asyncio.to_thread(pl.next_runs)).get(it["id"], "?")
+    await interaction.followup.send(embed=embed(
+        f"🗓️ Farm programmé #{it['id']}", f"**{it['heure']}** · {pl.JOURS[it['jours']].lower()}\n`{' '.join(it['sequence'])}`\n"
+        f"Prochaine exécution : **{nxt}**", COLORS["info"],
+        tip="Le PC peut être en veille (il se réveille), pas éteint · /planning pour voir ou supprimer"))
+
+
+@cmd(name="planning", description="🗓️ Les farms programmés (et supprimer un créneau)")
+@app_commands.describe(supprimer="Numéro du créneau à supprimer (voir la liste)")
+async def planning_cmd(interaction: discord.Interaction, supprimer: int = 0):
+    await interaction.response.defer(ephemeral=EPH)
+    import planificateur as pl
+    if supprimer:
+        ok = await asyncio.to_thread(pl.remove, supprimer)
+        await interaction.followup.send(embed=embed(f"🗑️ Créneau #{supprimer} supprimé" if ok else f"Créneau #{supprimer} introuvable",
+                                                    "", COLORS["info"] if ok else COLORS["bad"]))
+        return
+    items = pl.load()
+    nxt = await asyncio.to_thread(pl.next_runs)
+    lines = [pl.describe(it) + f"  ·  prochaine : {nxt.get(it['id'], '⚠️ tâche Windows absente')}" for it in items]
+    await interaction.followup.send(embed=embed("🗓️ Farms programmés", ("\n".join(lines) or "Aucun pour l'instant.")[:3900],
+                                                COLORS["info"], tip="/planifier pour en ajouter · /planning supprimer:N"))
+
+
+# ---------------------------------------------------------------- /stats
+@cmd(name="stats", description="📊 Statistiques des farms : runs, temps, réussite, dernières sessions")
+@app_commands.describe(jours="Sur combien de jours (1 à 90, défaut 7)")
+async def stats_cmd(interaction: discord.Interaction, jours: app_commands.Range[int, 1, 90] = 7):
+    import stats
+    s = await asyncio.to_thread(stats.summary, jours)
+    t = s["total"]
+    e = embed(f"📊 Statistiques : {jours} dernier{'s' if jours > 1 else ''} jour{'s' if jours > 1 else ''}",
+              f"**{t['runs']} runs** en **{t['sessions']} session(s)** · {stats.hms(t['duree'])} de farm · "
+              f"**{t['reussite']} %** finies\n🔋 {t['recharges']} recharge(s) · 🛡️ {t['relances']} relance(s) · "
+              f"🔄 {t['reprises']} reprise(s)", COLORS["info"], tip="Historique complet : bouton 📊 Stats de l'assistant")
+    for m, a in list(s["modes"].items())[:10]:
+        e.add_field(name=m, value=f"{a['runs']} runs · {a['sessions']} session(s) · {stats.hms(a['duree'])} · {a['reussite']} %",
+                    inline=False)
+    last = [stats.describe(x) for x in stats.summary(0)["dernieres"][:5]]
+    e.add_field(name="Dernières sessions", value=("\n".join(last) or "aucune pour l'instant")[:1024], inline=False)
+    await interaction.response.send_message(embed=e, ephemeral=EPH)
+
+
 # ---------------------------------------------------------------- /aide
 @cmd(name="aide", description="❓ Comment ça marche : les commandes, les persos, les options")
 async def aide_cmd(interaction: discord.Interaction):
@@ -724,6 +905,8 @@ async def aide_cmd(interaction: discord.Interaction):
         "**/statut** — où ça en est, avec la barre de progression\n"
         "**/capture** — l'écran de l'émulateur en photo\n"
         "**/stop** — tout arrêter\n"
+        "**/stats** — tes statistiques (runs, temps, dernières sessions)\n"
+        "**/planifier** · **/planning** — programmer un farm à heure fixe\n"
         "À la fin, je t'écris en privé avec le résumé."), inline=False)
     await interaction.response.send_message(embed=e, ephemeral=EPH)
 
