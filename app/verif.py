@@ -104,6 +104,15 @@ def check_discord():
     return "discord", "warn", "bot Discord configuré mais arrêté", "Lance lancer_discord.bat (ou la fenêtre MHA)."
 
 
+def alt_device(adb, device):
+    """Appareil qui repond quand celui enregistre est absent (sinon None) : propose dans l'assistant."""
+    if not adb:
+        return None
+    code, out = _adb(adb, "devices")
+    devs = [l.split()[0] for l in out.splitlines()[1:] if l.strip().endswith("device")]
+    return devs[0] if devs and device not in devs else None
+
+
 def run_all(adb, device):
     """Toutes les verifications, dans l'ordre d'affichage."""
     out = [check_device(adb, device)]

@@ -76,8 +76,6 @@ SETTLE = 0.7                          # pause apres chaque tap (s)
 LOOP_DELAY = 0.3                      # pause entre deux captures (s)
 STAGE_TIMEOUT = 30                    # s sans progres dans une etape -> on se re-synchronise
 IDLE_LIMIT = 300                      # s sans AUCUNE action -> arret
-MAX_BATTLES = 14                      # securite : recalcule plus bas = 2 essais x nombre de persos
-AUTO_POS = None                       # inutile normalement : le bot clique sur auto.png
 SWIPE_Y = 0.50                        # hauteur (0-1) de la ligne de cartes, la ou on fait glisser le doigt
 SWIPE_X_MIN = 0.06                    # zone horizontale (0-1) ou on glisse : bord gauche de la liste de cartes
 SWIPE_X_MAX = 0.94                    # ... bord droit. Si un panneau lateral est visible (plus/Attempts/Challenge), la zone s'arrete avant lui
@@ -201,10 +199,23 @@ def adb(*args, binary=False, timeout=30):
     return r.stdout if binary else r.stdout.decode(errors="ignore")
 
 
+FAST_SHOT = True               # capture brute (sans PNG) : ~2x plus rapide ; repli PNG automatique (comme auto_nightops)
+
+
 def screenshot():
-    global DEVICE
+    global DEVICE, FAST_SHOT
     err = None
     for _ in range(5):
+        if FAST_SHOT:
+            try:
+                img = emulateur.decode_raw(adb("exec-out", "screencap", binary=True))
+                if img is not None:
+                    journal.frame(img)
+                    return img
+                FAST_SHOT = False
+                log("capture rapide non reconnue : retour a la capture PNG (normale)")
+            except Exception as e:
+                err = e                        # souci passager : on tente le PNG pour ce tour
         try:
             png = adb("exec-out", "screencap", "-p", binary=True)
             img = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_COLOR)
@@ -416,11 +427,7 @@ def h_hero(screen):
         return True
 
 
-def card_sig(screen):
-    """Signature de la zone des cartes (pour savoir si la liste a bouge apres un glissement)."""
-    h = screen.shape[0]
-    band = cv2.cvtColor(screen[int(0.15 * h):int(0.85 * h)], cv2.COLOR_BGR2GRAY)
-    return cv2.resize(band, (96, 48), interpolation=cv2.INTER_AREA).astype(np.float32)
+from commun import card_sig                       # signature de la liste des cartes (commun.py)
 
 
 def reset_scan():
@@ -696,7 +703,7 @@ def main():
         return run_swipe_test()
     load_templates()
     if "--no-home" not in sys.argv:
-        nav.Home(screenshot, tap, log, back=lambda: adb("shell", "input", "keyevent", "4")).go()          # retour au menu principal, d'ou qu'on parte
+        nav.make(screenshot, tap, adb, log).go()          # retour au menu principal, d'ou qu'on parte
     RF = None
     if refill.enabled():                  # recharge de stamina par code (option) : voir refill.py
         RF = refill.Refill(screenshot, tap, adb, log, Done)
@@ -706,7 +713,7 @@ def main():
             RF = None
         else:
             log(f"Recharge de stamina : ACTIVEE (code {RF.code} x{RF.count})")
-    REPRISE = nav.Reprise(nav.Home(screenshot, tap, log, back=lambda: adb("shell", "input", "keyevent", "4")), log)   # ecran inconnu 60 s -> menu + reprise
+    REPRISE = nav.Reprise(nav.make(screenshot, tap, adb, log), log)   # ecran inconnu 60 s -> menu + reprise
     WD = watchdog.make(screenshot, tap, adb, log, Done)      # chien de garde (option) : maintenance / jeu bloque -> relance
     S.done, S.cur, S.no_att, S.battles = set(), None, False, 0
     reset_scan()
@@ -756,6 +763,5 @@ def main():
 
 
 if __name__ == "__main__":
-    import journal
     journal.start("herotrial")                 # journal de session dans logs/ (garde les 10 derniers)
     journal.run(main, Done)               # meme affichage qu'avant + incident (capture, boite noire) si arret anormal

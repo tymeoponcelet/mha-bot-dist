@@ -39,6 +39,24 @@ def _run(args, timeout=30):
         return -1, str(e)
 
 
+def decode_raw(raw):
+    """Capture BRUTE d'adb (exec-out screencap, sans PNG : ~2x plus rapide) -> image BGR, ou None si format inattendu."""
+    import struct
+    import cv2
+    import numpy as np
+    if not raw or len(raw) < 16:
+        return None
+    w, h, fmt = struct.unpack("<III", raw[:12])
+    n = w * h * 4
+    if fmt != 1 or not (0 < w <= 8192 and 0 < h <= 8192):
+        return None
+    for hdr in (12, 16):                       # l'en-tete fait 12 octets (Android <= 9) ou 16 (Android 10+)
+        if len(raw) - hdr == n:
+            img = np.frombuffer(raw, np.uint8, count=n, offset=hdr).reshape(h, w, 4)
+            return cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
+    return None
+
+
 def manager():
     """Chemin de MuMuManager.exe, ou None (autre emulateur : on se contente de relancer ADB)."""
     env = os.environ.get("MHA_MUMU_MANAGER")

@@ -53,7 +53,6 @@ from auto_nightops import Done, Tpl, log
 
 BASE = Path(__file__).resolve().parent
 TDIR = BASE / "templates_aa"
-FLOORS = TDIR / "floors"
 ALL_BOTS = ("deku", "bakugo", "shoto", "momo", "ochaco", "eijiro", "fumikage", "denki")
 BOT_NAMES = {"deku": "Izuku Midoriya", "bakugo": "Katsuki Bakugo", "shoto": "Shoto Todoroki", "momo": "Momo Yaoyorozu",
              "ochaco": "Ochaco Uraraka", "eijiro": "Eijiro Kirishima", "fumikage": "Fumikage Tokoyami", "denki": "Denki Kaminari"}
@@ -83,13 +82,7 @@ except Exception:
     pass
 
 
-def _arg(flag, cast=int):
-    if flag in sys.argv:
-        try:
-            return cast(sys.argv[sys.argv.index(flag) + 1])
-        except (IndexError, ValueError):
-            pass
-    return None
+from commun import arg as _arg                   # valeur d'une option de la ligne de commande (commun.py)
 
 
 MAX_RUNS = max(1, _arg("--runs") or MAX_RUNS)
@@ -142,7 +135,6 @@ CARD_ANCHOR = (830.5, 157.5)
 CARD_XY = [(245, 350), (508, 350), (770, 350), (1033, 350), (1296, 350)]
 # zone du chiffre du floor dans permit.png (fractions de l'image complete)
 FLOOR_BOX = (0.137, 0.275, 0.31, 0.51)
-FLOOR_THR = 0.86               # deux chiffres differents montent a ~0,75 : il faut etre strict
 
 T = {}
 BOT_T = {}
@@ -321,22 +313,6 @@ def read_floor(screen):
             except Exception:
                 pass
     return n, (min((c for _d, _h, c, _g in det), default=0.0)), m
-
-
-def learn_floor(n, mask):
-    try:
-        FLOORS.mkdir(parents=True, exist_ok=True)
-        f = FLOORS / f"{n}.png"
-        if mask is not None and not f.exists():
-            cv2.imwrite(str(f), mask)
-            log(f"floor {n} : chiffre appris (templates_aa/floors/{n}.png)")
-    except Exception:
-        pass
-
-
-def seed_floors():
-    """(ancien systeme d'apprentissage des floors : remplace par aa_digits.py)"""
-    return
 
 
 # ---------------------------------------------------------------- bots
@@ -556,7 +532,6 @@ def pick_char(floor=None):
 def run_test():
     fastmatch.FAST = False
     load_templates(strict=False)
-    seed_floors()
     screen = nt.screenshot()
     print(f"Capture : {screen.shape[1]}x{screen.shape[0]} | bots : {', '.join(BOTS)} | reset au floor : {RESET_FLOOR or 'jamais'}")
     print(f"{'image':<14}{'score':>7}{'seuil':>7}  resultat")
@@ -581,11 +556,10 @@ def main():
         nt.init_adb()
         return run_test()
     load_templates()
-    seed_floors()
     nt.init_adb()
     if "--no-home" not in sys.argv:
-        nav.Home(nt.screenshot, nt.tap, log, back=lambda: nt.adb("shell", "input", "keyevent", "4")).go()
-    REPRISE = nav.Reprise(nav.Home(nt.screenshot, nt.tap, log, back=lambda: nt.adb("shell", "input", "keyevent", "4")), log)   # ecran inconnu 60 s -> menu + reprise
+        nav.make(nt.screenshot, nt.tap, nt.adb, log).go()
+    REPRISE = nav.Reprise(nav.make(nt.screenshot, nt.tap, nt.adb, log), log)   # ecran inconnu 60 s -> menu + reprise
     seen_t = time.time()                # derniere fois qu'une image a ete reconnue
     WD = watchdog.make(nt.screenshot, nt.tap, nt.adb, log, Done)
     last = {n: 0.0 for n in SPEC}

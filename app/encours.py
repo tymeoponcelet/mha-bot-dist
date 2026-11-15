@@ -8,6 +8,7 @@ stop() arrete le farm (et les scripts lances par l'enchaineur).
 """
 import json
 import os
+import sys
 import re
 import subprocess
 import time
@@ -74,7 +75,7 @@ def declare(script, label, log=None):
     pid = os.getpid()
     rec = {"pid": pid, "pstart": _creation_time(pid) or time.time(), "script": script, "label": label,
            "source": os.environ.get("MHA_SOURCE") or "manuel", "t0": time.time(), "done": None, "total": None,
-           "step": None, "last": "", "log": str(log or "")}
+           "step": None, "last": "", "log": str(log or ""), "args": sys.argv[1:]}      # options reelles (--refill...)
     _me["rec"] = rec
     _write(rec)
     import atexit

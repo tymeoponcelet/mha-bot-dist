@@ -177,6 +177,14 @@ def do_update(root, settings, say=log, check_only=False):
         return result
     app = root / "app"
     app.mkdir(parents=True, exist_ok=True)
+    if (todo or removed) and (app / "sauvegarde.py").exists():   # reglages perso sauvegardes avant toute mise a jour
+        try:
+            if str(app) not in sys.path:
+                sys.path.insert(0, str(app))
+            import sauvegarde
+            sauvegarde.backup("avant_maj", base=app)
+        except Exception as e:                      # noqa: BLE001 - la sauvegarde ne doit jamais bloquer la mise a jour
+            say(f"(!) sauvegarde des reglages impossible : {e}")
     if todo:
         stage = root / "staging"
         shutil.rmtree(stage, ignore_errors=True)
@@ -210,8 +218,12 @@ def do_update(root, settings, say=log, check_only=False):
             safe_path(app, rel).unlink()
         except (OSError, ValueError):
             pass
+    hist = installed.get("historique", [])
+    if m["version"] != installed.get("version"):          # quoi de neuf : les 20 dernieres versions installees
+        hist = (hist + [{"version": m["version"], "message": m.get("message", ""), "date": time.strftime("%Y-%m-%d %H:%M")}])[-20:]
     (root / "installed.json").write_text(
-        json.dumps({"version": m["version"], "files": sorted(m["files"])}, indent=1), encoding="utf-8")
+        json.dumps({"version": m["version"], "message": m.get("message", ""), "historique": hist, "files": sorted(m["files"])},
+                   indent=1, ensure_ascii=False), encoding="utf-8")
     return result
 
 

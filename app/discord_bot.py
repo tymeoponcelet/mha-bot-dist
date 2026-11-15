@@ -177,6 +177,7 @@ class Runner:
         with self.lock:
             self.lines.clear()
             self.label, self.emoji, self.t0, self.stopped = label, emoji, time.time(), False
+            self.cmd = list(cmd)                              # options reelles du farm (affichees par /panneau)
             self.proc = subprocess.Popen(cmd, cwd=BASE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                                          encoding="utf-8", errors="replace", env=dict(ENV, MHA_DISCORD="1", MHA_SOURCE="discord"),
                                          creationflags=NO_WINDOW)
@@ -462,6 +463,9 @@ async def on_ready():
         LOOP.create_task(incident_watch())                # incidents (logs/incidents) -> Discord
         discord_ui.register(client)                       # boutons des anciens messages : toujours actifs
         LOOP.create_task(discord_ui.panel_loop())         # tableau de bord (/panneau) mis a jour tout seul
+        LOOP.create_task(discord_ui.resume_loop())        # resume quotidien (/resume)
+        LOOP.create_task(discord_ui.announce_version())   # « Nouvelle version installee » apres une mise a jour
+        LOOP.run_in_executor(None, __import__("sauvegarde").daily)   # sauvegarde quotidienne des reglages
     if SYNC:
         try:
             await (tree.sync(guild=GUILD) if GUILD else tree.sync())
@@ -777,6 +781,13 @@ async def reglages_cmd(interaction: discord.Interaction):
 @cmd(name="farm", description="🎮 Lancer un farm avec des menus : mode, ressource, niveau, perso, nombre de runs")
 async def farm_cmd(interaction: discord.Interaction):
     await discord_ui.open_farm(interaction)
+
+
+@cmd(name="resume", description="🌙 Résumé quotidien : runs, temps, incidents, programme de la nuit (heure réglable)")
+@app_commands.describe(heure="Heure d'envoi chaque jour, ex. 21:00", desactiver="Oui = ne plus l'envoyer",
+                       maintenant="Oui = le voir tout de suite")
+async def resume_cmd(interaction: discord.Interaction, heure: str = None, desactiver: bool = False, maintenant: bool = False):
+    await discord_ui.resume_command(interaction, heure, desactiver, maintenant)
 
 
 @cmd(name="panneau", description="🎮 Tableau de bord en direct : farm en cours, progression, boutons Stop / Capture")

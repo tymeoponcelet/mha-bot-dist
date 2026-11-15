@@ -29,6 +29,7 @@ import cv2
 import numpy as np
 
 import auto_nightops as nt
+import commun
 import fastmatch
 import heroes
 import nav
@@ -112,12 +113,7 @@ if _CFG.exists():
 
 
 def _arg(flag):
-    if flag in sys.argv:
-        try:
-            return sys.argv[sys.argv.index(flag) + 1]
-        except IndexError:
-            return None
-    return None
+    return commun.arg(flag, str)                   # texte brut, comme avant (commun.py)
 
 
 if _arg("--mode"):
@@ -220,10 +216,7 @@ def grab():
     return nt.screenshot()
 
 
-def card_sig(screen):
-    h = screen.shape[0]
-    band = cv2.cvtColor(screen[int(0.15 * h):int(0.85 * h)], cv2.COLOR_BGR2GRAY)
-    return cv2.resize(band, (96, 48), interpolation=cv2.INTER_AREA).astype(np.float32)
+from commun import card_sig                       # signature de la liste des cartes (commun.py)
 
 
 class Sw:
@@ -305,7 +298,7 @@ def main():
     load_templates()
     nt.init_adb()
     if "--no-home" not in sys.argv:
-        nav.Home(nt.screenshot, nt.tap, log, back=lambda: nt.adb("shell", "input", "keyevent", "4")).go()   # retour au menu principal, d'ou qu'on parte
+        nav.make(nt.screenshot, nt.tap, nt.adb, log).go()   # retour au menu principal, d'ou qu'on parte
     last_tap = {n: 0.0 for n in SPEC}
     runs, auto_taps, nav_taps = 0, 0, 0
     max_done = False
@@ -313,7 +306,7 @@ def main():
     awaiting_pick, pick_t = False, 0.0        # "plus" tape : la liste des persos va s'ouvrir
     last_action = time.time()
     RF = nt.make_refill()                     # recharge de stamina par code (option) ; None si desactivee
-    REPRISE = nav.Reprise(nav.Home(nt.screenshot, nt.tap, log, back=lambda: nt.adb("shell", "input", "keyevent", "4")), log)   # ecran inconnu 60 s -> menu + reprise
+    REPRISE = nav.Reprise(nav.make(nt.screenshot, nt.tap, nt.adb, log), log)   # ecran inconnu 60 s -> menu + reprise
     seen_t = time.time()                # derniere fois qu'une image a ete reconnue
     WD = watchdog.make(nt.screenshot, nt.tap, nt.adb, log, Done)   # chien de garde (option) ; None si desactive
     print(f"Perso : {heroes.pretty(PICK.name)}")

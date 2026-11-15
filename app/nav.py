@@ -235,6 +235,11 @@ class Home:
         return False
 
 
+
+def make(shot, tap, adb, log, **kw):
+    """Retour au menu avec la touche Retour d'Android : la construction commune a tous les modes."""
+    return Home(shot, tap, log, back=lambda: adb("shell", "input", "keyevent", "4"), **kw)
+
 class Reprise:
     """Ecran inconnu : apres IDLE s sans action ET sans aucune image reconnue (hors combat) ->
     capture (incident, envoye sur Discord) + retour au menu principal ; le mode repart de zero, comme apres le garde-chien.

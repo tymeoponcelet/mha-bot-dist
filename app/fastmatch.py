@@ -99,6 +99,8 @@ def best(t, screen):
     score, loc = _best(t, screen)
     if score >= t.thr:
         derive.note(t, score)
+    elif score >= t.thr - derive.NEAR:
+        derive.near(t, score)                             # presque reconnu : capture pour comprendre (logs/presque/)
     return score, loc
 
 

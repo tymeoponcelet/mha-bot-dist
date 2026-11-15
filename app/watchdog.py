@@ -123,7 +123,7 @@ class Watchdog:
         self.pkg = str(c.get("game_package") or "")
         tc = c.get("tap_continue") or TAP_CONTINUE
         self.tap_continue = (float(tc[0]), float(tc[1]))
-        self.home = home or nav.Home(shot, tap, log, back=lambda: adb("shell", "input", "keyevent", "4"), base=base)
+        self.home = home or nav.make(shot, tap, adb, log, base=base)
         self.t = {k: nav._T(self.base / "templates_watchdog" / f"{k}.png", crop=s.get("crop", (0, 0, 1, 1)), thr=s["thr"])
                   for k, s in SPEC.items()}
         self.last_progress = time.time()

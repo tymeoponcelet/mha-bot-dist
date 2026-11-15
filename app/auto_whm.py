@@ -48,7 +48,6 @@ import auto_nightops as nt
 import fastmatch
 import heroes
 import nav
-import refill
 import watchdog
 from auto_nightops import Done, Tpl, log, tap_burst
 
@@ -96,13 +95,7 @@ except Exception:
     pass
 
 
-def _arg(flag, cast=int):
-    if flag in sys.argv:
-        try:
-            return cast(sys.argv[sys.argv.index(flag) + 1])
-        except (IndexError, ValueError):
-            pass
-    return None
+from commun import arg as _arg                   # valeur d'une option de la ligne de commande (commun.py)
 
 
 LEVEL = min(3, max(1, _arg("--level") or LEVEL))
@@ -289,8 +282,8 @@ def main():
     load_templates()
     nt.init_adb()
     if "--no-home" not in sys.argv:
-        nav.Home(nt.screenshot, nt.tap, log, back=lambda: nt.adb("shell", "input", "keyevent", "4")).go()
-    HOME = nav.Home(nt.screenshot, nt.tap, log, back=lambda: nt.adb("shell", "input", "keyevent", "4"))
+        nav.make(nt.screenshot, nt.tap, nt.adb, log).go()
+    HOME = nav.make(nt.screenshot, nt.tap, nt.adb, log)
     RF = nt.make_refill()                              # recharge de stamina (option)
     REPRISE = nav.Reprise(HOME, log)    # ecran inconnu 60 s -> menu + reprise
     seen_t = time.time()                # derniere fois qu'une image a ete reconnue

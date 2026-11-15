@@ -20,8 +20,13 @@ MIN_SESS = 3                    # sessions d'historique minimum avant de compare
 MIN_N = 5                       # detections minimum dans une session pour l'ajouter a l'historique
 KEEP = 20                       # sessions gardees par image
 
+NEAR = 0.12                    # "presque reconnu" : score entre seuil - NEAR et seuil
+NEAR_DIR = BASE / "logs" / "presque"
+NEAR_PER_SESSION = 15           # captures maxi par session (une par image)
+NEAR_KEEP = 40                  # captures gardees sur le disque
+
 _lock = threading.Lock()
-_st = {"hist": None, "sess": {}, "sus": {}, "alerted": set(), "ref": {}, "hooked": False}
+_st = {"hist": None, "sess": {}, "sus": {}, "alerted": set(), "ref": {}, "hooked": False, "near": set()}
 
 
 def _active():
@@ -75,6 +80,36 @@ def note(t, score):
             journal.incident(f"Image qui se dégrade : {name} trouvée à {score:.2f} au lieu de {ref:.2f} d'habitude "
                              f"(seuil {thr:.2f}). Le jeu a peut-être changé : refais cette image à partir de capture.png "
                              f"avant qu'elle ne soit plus reconnue.", live=True, kind="derive")
+    except Exception:                       # noqa: BLE001 - jamais de gene pour le farm
+        pass
+
+
+def near(t, score):
+    """Image PRESQUE reconnue pendant un vrai farm : on garde l'ecran (une fois par image et par session).
+    Sert a voir quels boutons ont du mal (decor de la ville, mise a jour du jeu) avant qu'ils ne bloquent le bot."""
+    name = getattr(t, "name", None)
+    if not name or not _active():
+        return
+    with _lock:
+        if name in _st["near"] or len(_st["near"]) >= NEAR_PER_SESSION:
+            return
+        _st["near"].add(name)
+    try:
+        import time
+        import cv2
+        import journal
+        img = journal._last.get("img")
+        if img is None:
+            return
+        NEAR_DIR.mkdir(parents=True, exist_ok=True)
+        stem = f"{time.strftime('%Y%m%d-%H%M%S')}_{name.replace('/', '__').removesuffix('.png')}_{score:.2f}"
+        cv2.imwrite(str(NEAR_DIR / f"{stem}.png"), img)
+        with open(NEAR_DIR / "index.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"fichier": f"{stem}.png", "image": name, "score": round(float(score), 3),
+                                "seuil": float(getattr(t, "thr", 0)), "script": journal._state.get("script"),
+                                "heure": time.strftime("%Y-%m-%d %H:%M:%S")}, ensure_ascii=False) + "\n")
+        import journal as _j
+        _j.rotate(NEAR_DIR, "2*.png", NEAR_KEEP)
     except Exception:                       # noqa: BLE001 - jamais de gene pour le farm
         pass
 

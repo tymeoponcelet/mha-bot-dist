@@ -13,6 +13,7 @@ Aucune dépendance : uniquement tkinter (fourni avec Python).
 import json
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -30,6 +31,8 @@ import stats                   # historique des farms (logs/runs.jsonl)
 import planificateur as pl     # farms programmes (planning.json + Planificateur de taches Windows)
 import profils                 # profils de configuration (profils.json)
 import encours                 # farm en cours, partage avec Discord et le planning
+import refaire                 # refaire une image de bouton depuis une capture
+import sauvegarde              # sauvegardes des reglages (logs/sauvegardes)
 import heroes as hz            # liste / noms des persos (templates_chars/) ; n'a pas besoin d'opencv ici
 
 BASE = Path(__file__).resolve().parent
@@ -348,6 +351,7 @@ class App(tk.Tk):
         self.refresh_all()
         self.after(600, self.run_verif)                          # verification automatique a l'ouverture
         self.after(1000, self.watch_ext)                         # farm en cours lance ailleurs : affiche + Stop
+        threading.Thread(target=sauvegarde.daily, daemon=True).start()   # sauvegarde quotidienne des reglages
 
     # ================= interface =================
     def setup_style(self):
@@ -388,12 +392,15 @@ class App(tk.Tk):
         head.pack(fill="x", padx=18, pady=(14, 4))
         tk.Label(head, text="MHA BOT", bg=BG, fg=YELLOW, font=("Segoe UI Black", 30)).pack(side="left")
         tk.Label(head, text="  ⚡ PLUS ULTRA !", bg=BG, fg=GREEN, font=F(15, True)).pack(side="left", pady=(12, 0))
+        import version
+        tk.Label(head, text="  " + version.label(), bg=BG, fg=MUTED, font=F(8)).pack(side="left", pady=(18, 0))
         self.auto_btn = Btn(head, "⚡ Tout configurer automatiquement", self.auto_setup,
                             bg=BLUE, size=10, padx=14, pady=8)
         self.auto_btn.pack(side="right", pady=(6, 0))
         tools = tk.Frame(self.body, bg=BG)                        # outils : sur leur propre ligne (fenetre etroite)
         tools.pack(fill="x", padx=18, pady=(0, 6))
-        for txt, fn in (("🗓️ Planning", self.open_planning), ("📊 Stats", self.open_stats), ("👤 Profils", self.open_profiles)):
+        for txt, fn in (("🗓️ Planning", self.open_planning), ("📊 Stats", self.open_stats), ("👤 Profils", self.open_profiles),
+                        ("🖼️ Images", self.open_refaire), ("💾 Sauvegardes", self.open_backups)):
             Btn(tools, txt, fn, bg=GREY, fg=TEXT, size=10, padx=12, pady=5).pack(side="left", padx=(0, 8))
 
         prog = tk.Frame(self.body, bg=BG)
@@ -440,6 +447,8 @@ class App(tk.Tk):
         self.verif_when = tk.Label(vtop, text="", bg=CARD, fg=MUTED, font=F(8))
         self.verif_when.pack(side="left", padx=(10, 0))
         Btn(vtop, "🔄 Vérifier", self.run_verif, bg=GREY, fg=TEXT, size=9, padx=10, pady=3).pack(side="right")
+        self.verif_fix = Btn(vtop, "", self.use_alt_device, bg=GREEN, size=9, padx=10, pady=3)   # emulateur qui a change de nom
+        self.verif_alt = None
         self.verif_lbls = {}
         for key in ("device", "resolution", "game", "foreground", "discord"):
             lb = tk.Label(vf, text="…", bg=CARD, fg=MUTED, font=F(9), anchor="w", justify="left", wraplength=780)
@@ -1282,6 +1291,192 @@ class App(tk.Tk):
                      font=F(9)).pack(anchor="w", padx=8, pady=4)
         return win
 
+    def open_refaire(self):
+        """🖼️ Images : refaire une image de bouton a partir d'une capture (rectangle a la souris), puis verification."""
+        win = tk.Toplevel(self)
+        win.title("MHA Bot - refaire une image")
+        win.configure(bg=BG)
+        win.geometry("1220x720")
+        tk.Label(win, text="🖼️ Refaire une image de bouton", bg=BG, fg=YELLOW, font=F(16, True)).pack(anchor="w", padx=16, pady=(12, 0))
+        tk.Label(win, text="1) choisis une capture  2) choisis l'image à remplacer  3) trace un rectangle autour du bouton  "
+                 "4) Enregistrer et vérifier. L'ancienne image est gardée (bouton « Remettre l'ancienne »).",
+                 bg=BG, fg=MUTED, font=F(9), wraplength=1180, justify="left").pack(anchor="w", padx=16, pady=(0, 8))
+        body = tk.Frame(win, bg=BG)
+        body.pack(fill="both", expand=True, padx=16)
+        left = tk.Frame(body, bg=BG)
+        left.pack(side="left", fill="y")
+        caps = refaire.captures()
+        lb = tk.Listbox(left, width=46, height=26, bg=CARD, fg=TEXT, selectbackground=BLUE, font=F(9), activestyle="none")
+        for _p, label, _s in caps:
+            lb.insert("end", label[:70])
+        lb.pack(fill="y", expand=True)
+        right = tk.Frame(body, bg=BG)
+        right.pack(side="left", fill="both", expand=True, padx=(12, 0))
+        top = tk.Frame(right, bg=BG)
+        top.pack(fill="x")
+        tk.Label(top, text="Image à remplacer", bg=BG, fg=MUTED, font=F(9, True)).pack(side="left")
+        target = ttk.Combobox(top, width=44, values=refaire.templates())
+        target.pack(side="left", padx=(6, 10))
+        preview = tk.Label(top, bg=BG)
+        preview.pack(side="left")
+        canvas = tk.Canvas(right, width=800, height=450, bg="#000000", highlightthickness=0, cursor="crosshair")
+        canvas.pack(anchor="w", pady=(6, 6))
+        status = tk.Label(right, text="", bg=BG, fg=MUTED, font=F(10, True), anchor="w", justify="left", wraplength=800)
+        bot = tk.Frame(right, bg=BG)
+        bot.pack(fill="x")
+        st = {"cap": None, "img": None, "rect": None, "box": None, "start": None, "backup": None, "prev": None}
+
+        def show_preview(*_):
+            p = BASE / target.get()
+            try:
+                im = tk.PhotoImage(file=str(p))
+                while im.width() > 220 or im.height() > 70:
+                    im = im.subsample(2)
+                st["prev"] = im
+                preview.config(image=im, text="")
+            except Exception:                                # noqa: BLE001
+                preview.config(image="", text="(nouvelle image)", fg=MUTED)
+        target.bind("<<ComboboxSelected>>", show_preview)
+
+        def pick(_e=None):
+            sel = lb.curselection()
+            if not sel:
+                return
+            path, _label, sug = caps[sel[0]]
+            st["cap"], st["box"] = path, None
+            img = tk.PhotoImage(file=str(path))
+            st["scale"] = 2 if img.width() > 800 else 1
+            st["img"] = img.subsample(st["scale"]) if st["scale"] > 1 else img
+            canvas.delete("all")
+            canvas.create_image(0, 0, anchor="nw", image=st["img"])
+            if sug:
+                target.set(sug)
+                show_preview()
+            status.config(text="Trace un rectangle autour du bouton (clic gauche maintenu).", fg=MUTED)
+        lb.bind("<<ListboxSelect>>", pick)
+
+        def press(e):
+            st["start"] = (e.x, e.y)
+            if st["rect"]:
+                canvas.delete(st["rect"])
+            st["rect"] = canvas.create_rectangle(e.x, e.y, e.x, e.y, outline=YELLOW, width=2)
+
+        def drag(e):
+            if st["start"]:
+                canvas.coords(st["rect"], *st["start"], e.x, e.y)
+
+        def release(e):
+            if not st["start"]:
+                return
+            x0, y0 = st["start"]
+            k = st.get("scale", 1)
+            st["box"] = (min(x0, e.x) * k, min(y0, e.y) * k, max(x0, e.x) * k, max(y0, e.y) * k)
+            st["start"] = None
+            b = st["box"]
+            status.config(text=f"Rectangle : {int(b[2] - b[0])} x {int(b[3] - b[1])} px. Clique sur « Enregistrer et vérifier ».",
+                          fg=MUTED)
+        canvas.bind("<ButtonPress-1>", press)
+        canvas.bind("<B1-Motion>", drag)
+        canvas.bind("<ButtonRelease-1>", release)
+
+        def save():
+            if not st["cap"] or not st["box"] or not target.get():
+                status.config(text="❌ Il faut une capture, l'image à remplacer et un rectangle.", fg=RED)
+                return
+            try:
+                st["backup"] = refaire.save_crop(st["cap"], st["box"], target.get())
+            except ValueError as e:
+                status.config(text=f"❌ {e}", fg=RED)
+                return
+            show_preview()
+            status.config(text="✔ Image enregistrée. Vérification en cours (mêmes réglages que le bot)…", fg=YELLOW)
+            cap, tgt = st["cap"], target.get()
+
+            def work():
+                try:
+                    r = refaire.check_subprocess(tgt, cap)
+                    if not r["ok"]:
+                        msg, col = (f"⚠️ Pas reconnue sur cette capture ({r['score']} < seuil {r['seuil']}) : retrace le "
+                                    "rectangle plus serré autour du bouton, ou « Remettre l'ancienne »."), RED
+                    else:
+                        msg, col = f"✅ Reconnue : {r['score']} (seuil {r['seuil']}).", GREEN
+                        if r.get("ailleurs_fichier") and r["ailleurs_max"] >= r["seuil"]:
+                            msg += (f"\n   Trouvée aussi sur « {r['ailleurs_fichier']} » ({r['ailleurs_max']}) : normal si le "
+                                    "bouton y est vraiment, sinon c'est un faux positif → découpe plus précise.")
+                        elif r.get("ailleurs_fichier"):
+                            msg += f"  Ailleurs : {r['ailleurs_max']} au plus (pas de confusion)."
+                except Exception as e:                       # noqa: BLE001
+                    msg, col = f"⚠️ Vérification impossible : {e}", RED
+                self.after(0, lambda: status.config(text=msg, fg=col))
+            threading.Thread(target=work, daemon=True).start()
+
+        def undo():
+            b = st.get("backup")
+            if not b or not Path(b).exists():
+                status.config(text="Rien à remettre (pas d'ancienne image sauvegardée dans cette fenêtre).", fg=MUTED)
+                return
+            shutil.copy2(b, BASE / target.get())
+            st["backup"] = None
+            show_preview()
+            status.config(text="↩ Ancienne image remise.", fg=MUTED)
+        Btn(bot, "💾 Enregistrer et vérifier", save, bg=YELLOW, padx=14, pady=5).pack(side="left")
+        Btn(bot, "↩ Remettre l'ancienne", undo, bg=GREY, fg=TEXT, padx=12, pady=5).pack(side="left", padx=(8, 0))
+        status.pack(fill="x", pady=(6, 0))
+        if caps:
+            lb.selection_set(0)
+            pick()
+        win.refaire_ui = {"list": lb, "caps": caps, "target": target, "canvas": canvas, "status": status, "state": st,
+                          "press": press, "drag": drag, "release": release, "save": save, "undo": undo, "pick": pick}
+        return win
+
+    def open_backups(self):
+        """💾 Sauvegardes : liste, sauvegarder maintenant, restaurer (l'assistant se relance)."""
+        win = tk.Toplevel(self)
+        win.title("MHA Bot - sauvegardes")
+        win.configure(bg=BG)
+        win.geometry("720x460")
+        tk.Label(win, text="💾 Sauvegardes de tes réglages", bg=BG, fg=YELLOW, font=F(16, True)).pack(anchor="w", padx=16, pady=(12, 0))
+        tk.Label(win, text="Réglages, planning, profils. Une par jour, avant chaque mise à jour et avant chaque restauration "
+                 "(les 10 dernières). Le token Discord n'est jamais copié.", bg=BG, fg=MUTED, font=F(9), wraplength=680,
+                 justify="left").pack(anchor="w", padx=16, pady=(0, 8))
+        lst = tk.Frame(win, bg=CARD)
+        lst.pack(fill="x", padx=16)
+        status = tk.Label(win, text="", bg=BG, fg=MUTED, font=F(9), anchor="w", justify="left", wraplength=680)
+
+        def refresh():
+            for w in lst.winfo_children():
+                w.destroy()
+            items = sauvegarde.listing()
+            for d, when, why, files in items:
+                row = tk.Frame(lst, bg=CARD)
+                row.pack(fill="x", padx=8, pady=2)
+                tk.Label(row, text=f"{when}   {why:<20}   {', '.join(files)}", bg=CARD, fg=TEXT, font=F(9), anchor="w").pack(side="left")
+                Btn(row, "Restaurer", lambda d=d, when=when: restore(d, when), bg=YELLOW, size=9, padx=10, pady=1).pack(side="right")
+            if not items:
+                tk.Label(lst, text="Aucune sauvegarde pour l'instant.", bg=CARD, fg=MUTED, font=F(9)).pack(anchor="w", padx=8, pady=6)
+
+        def now():
+            d = sauvegarde.backup("manuelle")
+            status.config(text=f"✅ sauvegardé ({d.name})" if d else "Rien à sauvegarder.", fg=GREEN if d else MUTED)
+            refresh()
+
+        def restore(d, when):
+            if self.proc:
+                status.config(text="❌ Un farm tourne : arrête-le avant de restaurer.", fg=RED)
+                return
+            try:
+                files = sauvegarde.restore(d)
+            except (ValueError, OSError) as e:
+                status.config(text=f"❌ {e}", fg=RED)
+                return
+            status.config(text=f"✅ Restauré ({', '.join(files)}) depuis la sauvegarde du {when} : l'assistant se relance…", fg=GREEN)
+            self.after(800, self.restart)
+        Btn(win, "💾 Sauvegarder maintenant", now, bg=GREY, fg=TEXT, padx=12, pady=4).pack(anchor="w", padx=16, pady=(10, 0))
+        status.pack(fill="x", padx=16, pady=(6, 0))
+        refresh()
+        win.backups_ui = {"now": now, "restore": restore, "status": status, "list": lst}
+        return win
+
     def open_profiles(self):
         """Profils : enregistrer les reglages actuels sous un nom, en recharger un (l'assistant se relance), supprimer."""
         win = tk.Toplevel(self)
@@ -1498,14 +1693,35 @@ class App(tk.Tk):
             lb.config(text="… vérification", fg=MUTED)
 
         def work():
+            alt = None
             try:
                 res = verif.run_all(self.adb_path(), self.cfg.get("device"))
+                if res and res[0][1] == "warn":
+                    alt = verif.alt_device(self.adb_path(), self.cfg.get("device"))
             except Exception as e:                       # noqa: BLE001
                 res = [("device", "bad", f"vérification impossible ({e})", "")]
-            self.after(0, lambda: self.show_verif(res))
+            self.after(0, lambda: self.show_verif(res, alt))
         threading.Thread(target=work, daemon=True).start()
 
-    def show_verif(self, res):
+    def use_alt_device(self):
+        """Bouton « ✔ Utiliser <appareil> » : l'emulateur a change de nom, on enregistre celui qui repond."""
+        if not self.verif_alt:
+            return
+        self.cfg["device"] = self.verif_alt
+        save_cfg(self.cfg)
+        self.log(f"✔ Émulateur enregistré : {self.verif_alt}", GREEN)
+        self.verif_alt = None
+        self.verif_fix.pack_forget()
+        self.refresh_all()
+        self.run_verif()
+
+    def show_verif(self, res, alt=None):
+        self.verif_alt = alt
+        if alt:
+            self.verif_fix.config(text=f"✔ Utiliser {alt}")
+            self.verif_fix.pack(side="right", padx=(0, 8))
+        else:
+            self.verif_fix.pack_forget()
         icon = {"ok": ("✅", GREEN), "warn": ("⚠️", YELLOW), "bad": ("❌", RED)}
         for key, st, txt, tip in res:
             if key in self.verif_lbls:

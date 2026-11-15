@@ -14,7 +14,7 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent
 FILE = BASE / "profils.json"
 MACHINE = {"adb", "device", "game_package", "tap_continue", "maintenance_max_h", "watchdog_stall",
-           "watchdog_stall_battle", "refill_code", "refill_count"}
+           "watchdog_stall_battle", "refill_code", "refill_count", "resume_heure"}
 NAME_MAX = 30
 
 

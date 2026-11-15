@@ -224,15 +224,28 @@ def panel_embed():
         last_line, color = "", 0x5865F2
     e = discord.Embed(title=f"🎮 MHA Bot — {socket.gethostname()}", description=desc, color=color)
     e.add_field(name="Émulateur", value=f"{'🟢 ' + dev if dev else '🔴 éteint / introuvable'}", inline=True)
-    r, w = bool(B.cfg_get("stamina_refill", False)), bool(B.cfg_get("watchdog", False))
-    e.add_field(name="Options", value=f"🔋 {'oui' if r else 'non'} · 🛡️ {'oui' if w else 'non'}", inline=True)
+    running = B.runner.running or rec
+    args = (getattr(B.runner, "cmd", []) if B.runner.running else (rec or {}).get("args", [])) if running else []
+    r, w = effective_options(args)
+    e.add_field(name="Options de ce farm" if running else "Réglage général",
+                value=f"🔋 {'oui' if r else 'non'} · 🛡️ {'oui' if w else 'non'}", inline=True)
     t = stats.summary(1)["total"]
     e.add_field(name="Dernières 24 h", value=f"{t['runs']} runs · {stats.hms(t['duree'])}", inline=True)
     e.add_field(name="🗓️ Prochain farm programmé", value=_next_planned()[:200], inline=False)
+    import version
+    e.add_field(name="Version", value=version.label(B.BASE), inline=True)
     if last_line:
         e.add_field(name="Dernière ligne", value=f"`{last_line.replace('`', chr(39))}`", inline=False)
     e.set_footer(text="Mis à jour à " + time.strftime("%H:%M:%S") + " · se rafraîchit tout seul")
     return e
+
+
+def effective_options(args):
+    """(recharge, gardien) REELLEMENT appliques : --refill / --no-refill de la commande, sinon le reglage general."""
+    args = list(args or [])
+    r = True if "--refill" in args else False if "--no-refill" in args else bool(B.cfg_get("stamina_refill", False))
+    w = True if "--watchdog" in args else False if "--no-watchdog" in args else bool(B.cfg_get("watchdog", False))
+    return r, w
 
 
 def panel_view():
@@ -625,3 +638,142 @@ class HelpView(OwnerView):
 async def open_help(interaction):
     v = HelpView(0)
     await interaction.response.send_message(embed=v.embed(), view=v, ephemeral=B.EPH)
+
+
+# ---------------------------------------------------------------- résumé quotidien (/resume)
+def resume_embed():
+    """Bilan des dernieres 24 h + ce qui est programme dans les 24 h qui viennent."""
+    import stats
+    s = stats.summary(1)
+    t = s["total"]
+    e = discord.Embed(title=f"🌙 Résumé du {time.strftime('%d/%m')}", color=0x5865F2,
+                      description=f"**{t['runs']} runs** en **{t['sessions']} session(s)** · {stats.hms(t['duree'])} de farm · "
+                                  f"**{t['reussite']} %** finies\n🔋 {t['recharges']} recharge(s) · 🛡️ {t['relances']} relance(s) · "
+                                  f"🔄 {t['reprises']} reprise(s)")
+    modes = "\n".join(f"**{m}** — {a['runs']} runs · {stats.hms(a['duree'])} · {a['reussite']} %" for m, a in list(s["modes"].items())[:8])
+    e.add_field(name="Par mode", value=modes or "Aucun farm aujourd'hui.", inline=False)
+    today = time.strftime("%Y%m%d")
+    try:
+        inc = [d for d in (B.BASE / "logs" / "incidents").glob(f"{today}-*") if d.is_dir()]
+    except OSError:
+        inc = []
+    kinds = {}
+    for d in inc:
+        try:
+            k = json.loads((d / "incident.json").read_text(encoding="utf-8")).get("kind", "incident")
+        except (OSError, ValueError):
+            k = "incident"
+        kinds[k] = kinds.get(k, 0) + 1
+    names = {"arret": "arrêt", "plantage": "plantage", "incident": "blocage", "adb": "ADB / émulateur", "reprise": "écran inconnu",
+             "derive": "image qui se dégrade", "planning": "farm programmé"}
+    e.add_field(name="Incidents du jour", value=", ".join(f"{n} × {names.get(k, k)}" for k, n in kinds.items()) or "aucun 👍",
+                inline=False)
+    rec = B.encours.read()
+    if B.runner.running or rec:
+        e.add_field(name="En cours", value=(B.runner.label if B.runner.running else B.encours.describe(rec))[:200], inline=False)
+    try:
+        import planificateur as pl
+        items = {it["id"]: it for it in pl.load()}
+        nxt = pl.next_runs() if items else {}
+        soon = []
+        for i, when in nxt.items():
+            if i in items and when and when != "-":
+                soon.append(f"{when} · {pl.describe(items[i], short=True).split('  ·  ', 1)[-1]}")
+        e.add_field(name="🗓️ Programmé", value="\n".join(sorted(soon)[:6]) or "rien de programmé", inline=False)
+    except Exception:                                     # noqa: BLE001
+        pass
+    e.set_footer(text="Résumé quotidien · /resume pour changer l'heure ou le couper")
+    return e
+
+
+def _resume_mark():
+    return B.BASE / "logs" / "discord_resume_envoye"
+
+
+async def resume_tick(now=None):
+    """Un passage : a l'heure reglee (config 'resume_heure'), envoie le resume, une seule fois par jour. -> True si envoye."""
+    now = now or time.localtime()
+    h = B.cfg_get("resume_heure")
+    hm = time.strftime("%H:%M", now)
+    if not h or hm < h:
+        return False
+    today = time.strftime("%Y-%m-%d", now)
+    mark = _resume_mark()
+    if mark.exists() and mark.read_text(encoding="utf-8").strip() == today:
+        return False
+    mark.parent.mkdir(parents=True, exist_ok=True)
+    mark.write_text(today, encoding="utf-8")
+    if hm > _plus(h, 60):                                 # bot demarre bien apres l'heure : pas de resume en retard
+        return False
+    await B.send_owner(await asyncio.to_thread(resume_embed), view=Actions(["stats", "capture"]))
+    return True
+
+
+async def resume_loop():
+    while True:
+        await asyncio.sleep(30)
+        try:
+            await resume_tick()
+        except Exception as ex:                           # noqa: BLE001
+            print(f"(!) resume quotidien : {ex!r}", flush=True)
+
+
+def _plus(hhmm, minutes):
+    h, m = (int(x) for x in hhmm.split(":"))
+    t = min(23 * 60 + 59, h * 60 + m + minutes)
+    return f"{t // 60:02d}:{t % 60:02d}"
+
+
+async def resume_command(interaction, heure=None, desactiver=False, maintenant=False):
+    import planificateur as pl
+    if maintenant:
+        await interaction.response.send_message(embed=await asyncio.to_thread(resume_embed), ephemeral=B.EPH,
+                                                view=Actions(["stats", "capture"]))
+        return
+    if desactiver:
+        B.cfg_set("resume_heure", None)
+        await interaction.response.send_message(embed=B.embed("🌙 Résumé quotidien coupé", "", B.COLORS["info"],
+                                                              tip="/resume heure:21:00 pour le remettre"), ephemeral=B.EPH)
+        return
+    if heure:
+        try:
+            h, _j, _t = pl.validate(heure, "tous", "nightops:1")
+        except ValueError as e:
+            await interaction.response.send_message(embed=B.embed("❌ Heure invalide", str(e), B.COLORS["bad"]), ephemeral=B.EPH)
+            return
+        B.cfg_set("resume_heure", h)
+        await interaction.response.send_message(embed=B.embed("🌙 Résumé quotidien réglé", f"Chaque jour à **{h}** "
+                                                              f"({'dans le salon des résultats' if B.CHANNEL_ID else 'en message privé'}).",
+                                                              B.COLORS["info"], tip="/resume maintenant:Oui pour le voir tout de suite"),
+                                                ephemeral=B.EPH)
+        return
+    cur = B.cfg_get("resume_heure")
+    await interaction.response.send_message(embed=B.embed("🌙 Résumé quotidien", f"Actuellement : **{cur or 'coupé'}**.\n"
+                                                          "`/resume heure:21:00` · `/resume desactiver:Oui` · `/resume maintenant:Oui`",
+                                                          B.COLORS["info"]), ephemeral=B.EPH)
+
+
+# ---------------------------------------------------------------- version installee (lanceur) + « quoi de neuf »
+async def announce_version():
+    """Au demarrage du bot : si la version installee a change depuis la derniere fois -> message « Nouvelle version »."""
+    import version
+    i = version.info(B.BASE)
+    if i["dev"] or not i["version"]:
+        return False
+    mark = B.BASE / "logs" / "discord_version_vue"
+    try:
+        seen = mark.read_text(encoding="utf-8").strip()
+    except OSError:
+        seen = None
+    mark.parent.mkdir(parents=True, exist_ok=True)
+    mark.write_text(i["version"], encoding="utf-8")
+    if seen is None or seen == i["version"]:              # 1er demarrage : on note seulement
+        return False
+    e = discord.Embed(title=f"🆕 Nouvelle version installée : {i['version']}",
+                      description=f"**Quoi de neuf :** {i['message'] or '(pas de message)'}", color=0x2ECC71)
+    older = [x for x in version.news(B.BASE, 4) if x["version"] != i["version"]][:3]
+    if older:
+        e.add_field(name="Avant", value="\n".join(f"`{x['version']}` — {x['message']}"[:200] for x in older), inline=False)
+    e.set_footer(text="/aide pour voir ce que le bot sait faire")
+    await B.send_owner(e)
+    return True

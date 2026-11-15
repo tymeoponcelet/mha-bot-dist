@@ -171,6 +171,7 @@ def path():
 #   capture.png (derniere capture en taille reelle), boite_noire.jpg (planche des dernieres captures),
 #   fin_journal.txt (10 dernieres lignes), incident.json (raison...). Le bot Discord les envoie (voir discord_bot.py).
 INC_DIR = LOG_DIR / "incidents"
+VERIFY_ARGS = ("--test", "--list", "--swipe", "--capture", "--dry")   # lancements de verification : pas d'alerte
 FRAMES = 30
 THUMB = (320, 180)
 HANG_S = 180                               # s sans aucune capture pendant que le script tourne -> "bloque"
@@ -228,7 +229,10 @@ def _sheet():
 
 
 def incident(reason, live=False, kind="incident"):
-    """Enregistre un incident (voir plus haut). live=True : le script tourne encore (blocage). -> dossier ou None."""
+    """Enregistre un incident (voir plus haut). live=True : le script tourne encore (blocage). -> dossier ou None.
+    Mode verification (--test, --list...) : jamais d'incident, donc pas d'alerte Discord pour un simple test."""
+    if any(a in sys.argv[1:] for a in VERIFY_ARGS):
+        return None
     import json
     try:
         import cv2

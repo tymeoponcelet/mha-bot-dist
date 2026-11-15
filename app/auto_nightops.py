@@ -23,7 +23,6 @@ Dossier templates_nightops/ (captures a la MEME resolution que l'emulateur) :
 """
 import json
 import shutil
-import struct
 import subprocess
 import sys
 import time
@@ -170,16 +169,7 @@ FAST_SHOT = True               # capture brute (sans compression PNG cote emulat
 
 def _raw_shot():
     """Capture brute (RGBA). -> image BGR, ou None si le format n'est pas celui attendu."""
-    raw = adb("exec-out", "screencap", binary=True)
-    w, h, fmt = struct.unpack("<III", raw[:12])
-    n = w * h * 4
-    if fmt != 1 or not (0 < w <= 8192 and 0 < h <= 8192):
-        return None
-    for hdr in (12, 16):                       # l'en-tete fait 12 octets (Android <= 9) ou 16 (Android 10+)
-        if len(raw) - hdr == n:
-            img = np.frombuffer(raw, np.uint8, count=n, offset=hdr).reshape(h, w, 4)
-            return cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
-    return None
+    return emulateur.decode_raw(adb("exec-out", "screencap", binary=True))
 
 
 def screenshot():
@@ -238,7 +228,6 @@ class Tpl:
         # AUTO : on compare uniquement les pixels blancs (le decor change d'un combat a l'autre)
         return cv2.inRange(img, (200, 200, 200), (255, 255, 255)) if self.mask_white else img
 
-    _prep = prep                                # ancien nom, garde par compatibilite
 
     def best_exact(self, screen):
         """Comparaison couleur sur TOUTE la capture (ancienne methode : sert aux tests --test et de secours)."""
@@ -327,7 +316,7 @@ def main():
     load_templates()
     init_adb()
     if "--no-home" not in sys.argv:
-        nav.Home(screenshot, tap, log, back=lambda: adb("shell", "input", "keyevent", "4")).go()       # retour au menu principal, d'ou qu'on parte
+        nav.make(screenshot, tap, adb, log).go()       # retour au menu principal, d'ou qu'on parte
     last_tap = {n: 0.0 for n in SPEC}
     runs, auto_taps, again_n = 0, 0, 0
     max_done = False                    # "max" deja tape pour le prochain "start" ?
@@ -335,7 +324,7 @@ def main():
     awaiting_pick, pick_t = False, 0.0  # "plus" tape : la liste des persos va s'ouvrir
     last_action = time.time()
     RF = make_refill()                  # recharge de stamina par code (option) ; None si desactivee
-    REPRISE = nav.Reprise(nav.Home(screenshot, tap, log, back=lambda: adb("shell", "input", "keyevent", "4")), log)   # ecran inconnu 60 s -> menu + reprise
+    REPRISE = nav.Reprise(nav.make(screenshot, tap, adb, log), log)   # ecran inconnu 60 s -> menu + reprise
     seen_t = time.time()                # derniere fois qu'une image a ete reconnue
     WD = watchdog.make(screenshot, tap, adb, log, Done)     # chien de garde (option) : maintenance / jeu bloque -> relance ; None si desactive
     print(f"Perso : {heroes.pretty(PICK.name)}")
@@ -466,6 +455,5 @@ def main():
 
 
 if __name__ == "__main__":
-    import journal
     journal.start("nightops")                 # journal de session dans logs/ (garde les 10 derniers)
     journal.run(main, Done)               # meme affichage qu'avant + incident (capture, boite noire) si arret anormal
