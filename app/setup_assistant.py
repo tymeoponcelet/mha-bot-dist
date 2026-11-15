@@ -29,6 +29,7 @@ import verif                   # verification de l'installation (lecture seule)
 import stats                   # historique des farms (logs/runs.jsonl)
 import planificateur as pl     # farms programmes (planning.json + Planificateur de taches Windows)
 import profils                 # profils de configuration (profils.json)
+import encours                 # farm en cours, partage avec Discord et le planning
 import heroes as hz            # liste / noms des persos (templates_chars/) ; n'a pas besoin d'opencv ici
 
 BASE = Path(__file__).resolve().parent
@@ -144,6 +145,126 @@ class Btn(tk.Label):
             self.config(text=text)
 
 
+class StepEditor(tk.Frame):
+    """Editeur d'UNE etape de farm avec des menus (tous les modes) : planning et enchainement.
+    get() -> etape validee (dict d'enchainer) ou ValueError avec un message clair."""
+    NONE_HERO = "(celui déjà placé)"
+
+    def __init__(self, parent, bg=CARD):
+        super().__init__(parent, bg=bg)
+        self.bg = bg
+        self.keys = list(ec.MODES_UI)
+        top = tk.Frame(self, bg=bg)
+        top.pack(fill="x")
+        tk.Label(top, text="Mode", bg=bg, fg=MUTED, font=F(9, True)).pack(side="left")
+        self.mode = ttk.Combobox(top, width=24, state="readonly", values=[ec.MODES_UI[k][0] for k in self.keys])
+        self.mode.pack(side="left", padx=(6, 0))
+        self.mode.bind("<<ComboboxSelected>>", lambda e: self.build())
+        self.opts = tk.Frame(self, bg=bg)
+        self.opts.pack(fill="x", pady=(6, 0))
+        self.heroes = hz.available(CHAR_TPL)
+        self.cards = hero_chars()
+        self.w = {}
+        self.mode.current(0)
+        self.build()
+
+    def key(self):
+        return self.keys[self.mode.current()]
+
+    def _combo(self, row, label, values, width=10, current=0):
+        tk.Label(row, text=label, bg=self.bg, fg=MUTED, font=F(9, True)).pack(side="left", padx=(0, 4))
+        c = ttk.Combobox(row, width=width, state="readonly", values=values)
+        c.current(current)
+        c.pack(side="left", padx=(0, 14))
+        return c
+
+    def _spin(self, row, label, value, maxi=500):
+        tk.Label(row, text=label, bg=self.bg, fg=MUTED, font=F(9, True)).pack(side="left", padx=(0, 4))
+        s = tk.Spinbox(row, from_=1, to=maxi, width=5, font=F(10), justify="center")
+        s.delete(0, "end")
+        s.insert(0, str(value))
+        s.pack(side="left", padx=(0, 14))
+        return s
+
+    def build(self):
+        for c in self.opts.winfo_children():
+            c.destroy()
+        self.w = {}
+        k = self.key()
+        base = ec.MODES_UI[k][1]
+        row = tk.Frame(self.opts, bg=self.bg)
+        row.pack(fill="x")
+        if k == "supply":
+            self.w["supply"] = self._combo(row, "Ressource", list(ec.SUPPLY_NAMES.values()), 26, 1)
+            self.w["supply"].bind("<<ComboboxSelected>>", lambda e: self._levels())
+            self.w["level"] = self._combo(row, "Niveau", ["1", "2", "3", "4"], 4, 3)
+            self.w["runs"] = self._spin(row, "Multi-runs", base["runs"])
+        elif k in ("nightops", "entrance", "hallway", "library"):
+            if k != "nightops":
+                self.w["level"] = self._combo(row, "Niveau", ["1", "2", "3"], 4, 2)
+            self.w["runs"] = self._spin(row, "Multi-runs", base["runs"])
+        elif k == "aa":
+            self.w["runs"] = self._spin(row, "Combats", base["runs"])
+            bots = ["(aucun)"] + list(ec.AA_BOTS.values())
+            self.w["bot1"] = self._combo(row, "Bot 1", bots, 10, 1)
+            self.w["bot2"] = self._combo(row, "Bot 2", bots, 10, 2)
+            self.w["reset"] = self._combo(row, "Reset du permit au floor", ["jamais"] + [str(i) for i in range(2, 21)], 7, 0)
+        if k == "hero":
+            tk.Label(row, text="Persos à farmer", bg=self.bg, fg=MUTED, font=F(9, True)).pack(side="left", padx=(0, 6))
+            self.w["chars"] = {}
+            for i, c in enumerate(self.cards):
+                if i and i % 8 == 0:
+                    row = tk.Frame(self.opts, bg=self.bg)
+                    row.pack(fill="x", padx=(98, 0))
+                v = tk.BooleanVar(value=True)
+                tk.Checkbutton(row, text=c.capitalize(), variable=v, bg=self.bg, fg=TEXT, selectcolor=BG,
+                               activebackground=self.bg, activeforeground=TEXT, font=F(9)).pack(side="left")
+                self.w["chars"][c] = v
+            row = tk.Frame(self.opts, bg=self.bg)
+            row.pack(fill="x", pady=(4, 0))
+        if k != "aa":
+            names = [self.NONE_HERO] + [hz.pretty(h) for h in self.heroes]
+            self.w["hero"] = self._combo(row, "Perso qui combat", names, 16, 0)
+
+    def _levels(self):
+        sup = list(ec.SUPPLY_NAMES)[self.w["supply"].current()]
+        mx = ec.MAX_LEVEL[sup]
+        self.w["level"].config(values=[str(i) for i in range(1, mx + 1)])
+        if self.w["level"].current() >= mx or self.w["level"].current() < 0:
+            self.w["level"].current(mx - 1)
+
+    def get(self):
+        k = self.key()
+        st = dict(ec.MODES_UI[k][1])
+        try:
+            if "runs" in self.w:
+                st["runs"] = int(self.w["runs"].get())
+            if k == "supply":
+                st["supply"] = list(ec.SUPPLY_NAMES)[self.w["supply"].current()]
+            if "level" in self.w:
+                st["level"] = int(self.w["level"].get())
+        except ValueError:
+            raise ValueError("Nombre invalide (multi-runs / combats).") from None
+        if k == "hero":
+            chars = [c for c, v in self.w["chars"].items() if v.get()]
+            if not chars:
+                raise ValueError("Hero Trial : coche au moins un perso à farmer.")
+            st["chars"] = ",".join(chars)
+        if k == "aa":
+            keys = list(ec.AA_BOTS)
+            bots = [keys[c.current() - 1] for c in (self.w["bot1"], self.w["bot2"]) if c.current() > 0]
+            if len(set(bots)) < len(bots):
+                raise ValueError("Agency : choisis deux bots différents.")
+            st["bots"] = ",".join(bots) or None
+            st["reset"] = None if self.w["reset"].current() == 0 else int(self.w["reset"].get())
+        elif self.w["hero"].current() > 0:
+            st["hero"] = self.heroes[self.w["hero"].current() - 1]
+        try:
+            return ec.validate(st)
+        except SystemExit as e:
+            raise ValueError(str(e)) from None
+
+
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -202,8 +323,10 @@ class App(tk.Tk):
         self.setup_style()
         self.build_ui()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.ext = None                                          # farm lance AILLEURS (Discord, planning...) en cours
         self.refresh_all()
         self.after(600, self.run_verif)                          # verification automatique a l'ouverture
+        self.after(1000, self.watch_ext)                         # farm en cours lance ailleurs : affiche + Stop
 
     # ================= interface =================
     def setup_style(self):
@@ -247,9 +370,10 @@ class App(tk.Tk):
         self.auto_btn = Btn(head, "⚡ Tout configurer automatiquement", self.auto_setup,
                             bg=BLUE, size=10, padx=14, pady=8)
         self.auto_btn.pack(side="right", pady=(6, 0))
-        Btn(head, "📊 Stats", self.open_stats, bg=GREY, fg=TEXT, size=10, padx=12, pady=8).pack(side="right", padx=(0, 8), pady=(6, 0))
-        Btn(head, "🗓️ Planning", self.open_planning, bg=GREY, fg=TEXT, size=10, padx=12, pady=8).pack(side="right", padx=(0, 8), pady=(6, 0))
-        Btn(head, "👤 Profils", self.open_profiles, bg=GREY, fg=TEXT, size=10, padx=12, pady=8).pack(side="right", padx=(0, 8), pady=(6, 0))
+        tools = tk.Frame(self.body, bg=BG)                        # outils : sur leur propre ligne (fenetre etroite)
+        tools.pack(fill="x", padx=18, pady=(0, 6))
+        for txt, fn in (("🗓️ Planning", self.open_planning), ("📊 Stats", self.open_stats), ("👤 Profils", self.open_profiles)):
+            Btn(tools, txt, fn, bg=GREY, fg=TEXT, size=10, padx=12, pady=5).pack(side="left", padx=(0, 8))
 
         prog = tk.Frame(self.body, bg=BG)
         prog.pack(fill="x", padx=18, pady=(0, 6))
@@ -1106,7 +1230,7 @@ class App(tk.Tk):
         self.setup_bar.config(value=n)
         self.setup_lbl.config(text=f"Configuration : {n}/4" + ("   ·   tout est prêt ! 🎉" if n == 4 else ""),
                               fg=GREEN if n == 4 else MUTED)
-        if not self.proc:
+        if not self.proc and not self.ext:
             if n == 4:
                 self.launch_btn.style(YELLOW, DARK)
                 self.action_lbl.config(
@@ -1232,7 +1356,7 @@ class App(tk.Tk):
         win = tk.Toplevel(self)
         win.title("MHA Bot - planning")
         win.configure(bg=BG)
-        win.geometry("860x560")
+        win.geometry("900x700")
         tk.Label(win, text="🗓️ Farms programmés", bg=BG, fg=YELLOW, font=F(16, True)).pack(anchor="w", padx=16, pady=(12, 0))
         tk.Label(win, text="Le PC peut être en veille (il se réveille tout seul), pas éteint. Si un farm tourne déjà à l'heure "
                  "prévue, le créneau est sauté. Notification sur Discord à la fin.", bg=BG, fg=MUTED, font=F(9),
@@ -1277,41 +1401,87 @@ class App(tk.Tk):
 
         form = tk.Frame(win, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
         form.pack(fill="x", padx=16, pady=(14, 4))
-        tk.Label(form, text="Ajouter un créneau", bg=CARD, fg=TEXT, font=F(11, True)).grid(row=0, column=0, columnspan=4,
-                                                                                         sticky="w", padx=10, pady=(8, 4))
-        tk.Label(form, text="Heure", bg=CARD, fg=MUTED, font=F(9, True)).grid(row=1, column=0, sticky="w", padx=10)
-        heure = tk.Entry(form, width=8, font=F(11))
+        tk.Label(form, text="Nouveau créneau  ·  1. Ce qu'il faut farmer", bg=CARD, fg=TEXT, font=F(11, True)).pack(
+            anchor="w", padx=10, pady=(8, 4))
+        ed = StepEditor(form)
+        ed.pack(fill="x", padx=10)
+        steps = []
+        srow = tk.Frame(form, bg=CARD)
+        srow.pack(fill="x", padx=10, pady=(6, 0))
+        box = tk.Frame(form, bg=BG)
+        box.pack(fill="x", padx=10, pady=(6, 0))
+
+        def paint():
+            for c in box.winfo_children():
+                c.destroy()
+            for i, st in enumerate(steps):
+                r = tk.Frame(box, bg=BG)
+                r.pack(fill="x", pady=1)
+                tk.Label(r, text=f"{i + 1}.  {ec.describe(st)}", bg=BG, fg=TEXT, font=F(9), anchor="w").pack(side="left", padx=6)
+                Btn(r, "🗑", lambda i=i: (steps.pop(i), paint()), bg=GREY, fg=TEXT, size=8, padx=6, pady=0).pack(side="right")
+                Btn(r, "↓", lambda i=i: move(i, 1), bg=GREY, fg=TEXT, size=8, padx=6, pady=0).pack(side="right", padx=(0, 2))
+                Btn(r, "↑", lambda i=i: move(i, -1), bg=GREY, fg=TEXT, size=8, padx=6, pady=0).pack(side="right", padx=(0, 2))
+            if not steps:
+                tk.Label(box, text="Aucune étape : règle le mode ci-dessus puis « Ajouter cette étape » "
+                         "(plusieurs étapes = elles s'enchaînent).", bg=BG, fg=MUTED, font=F(9)).pack(anchor="w", padx=6, pady=3)
+
+        def move(i, d):
+            j = i + d
+            if 0 <= j < len(steps):
+                steps[i], steps[j] = steps[j], steps[i]
+                paint()
+
+        def add_step():
+            try:
+                steps.append(ed.get())
+                status.config(text="", fg=MUTED)
+            except ValueError as e:
+                status.config(text=f"❌ {e}", fg=RED)
+            paint()
+
+        def from_chain():
+            steps[:] = [dict(st) for st in self.chain_steps]
+            status.config(text=f"{len(steps)} étape(s) reprise(s) de l'enchaînement de l'assistant" if steps else
+                          "L'enchaînement de l'assistant est vide (mode Enchaîner).", fg=MUTED)
+            paint()
+        Btn(srow, "➕ Ajouter cette étape", add_step, bg=YELLOW, padx=12, pady=3).pack(side="left")
+        Btn(srow, "📋 Reprendre l'enchaînement de l'assistant", from_chain, bg=GREY, fg=TEXT, size=9, padx=10,
+            pady=3).pack(side="left", padx=(8, 0))
+        paint()
+
+        tk.Label(form, text="2. Quand", bg=CARD, fg=TEXT, font=F(11, True)).pack(anchor="w", padx=10, pady=(12, 4))
+        wrow = tk.Frame(form, bg=CARD)
+        wrow.pack(fill="x", padx=10, pady=(0, 10))
+        tk.Label(wrow, text="Heure", bg=CARD, fg=MUTED, font=F(9, True)).pack(side="left", padx=(0, 4))
+        heure = tk.Entry(wrow, width=7, font=F(11), justify="center")
         heure.insert(0, "02:00")
-        heure.grid(row=2, column=0, sticky="w", padx=10, pady=(0, 8))
-        tk.Label(form, text="Quand", bg=CARD, fg=MUTED, font=F(9, True)).grid(row=1, column=1, sticky="w", padx=10)
-        jours = ttk.Combobox(form, width=22, state="readonly", values=list(pl.JOURS.values()))
+        heure.pack(side="left", padx=(0, 14))
+        jours = ttk.Combobox(wrow, width=22, state="readonly", values=list(pl.JOURS.values()))
         jours.current(0)
-        jours.grid(row=2, column=1, sticky="w", padx=10, pady=(0, 8))
-        tk.Label(form, text="Séquence (comme l'enchaînement, ex. supply:money:4:10 nightops:5)", bg=CARD, fg=MUTED,
-                 font=F(9, True)).grid(row=1, column=2, sticky="w", padx=10)
-        seq = tk.Entry(form, width=48, font=F(11))
-        try:
-            seq.insert(0, " ".join(self.step_token(st) for st in self.chain_steps))   # l'enchainement deja compose
-        except Exception:                                    # noqa: BLE001
-            pass
-        seq.grid(row=2, column=2, sticky="we", padx=10, pady=(0, 8))
+        jours.pack(side="left", padx=(0, 14))
 
         def add():
+            if not steps:
+                status.config(text="❌ Ajoute au moins une étape (1. Ce qu'il faut farmer).", fg=RED)
+                return
             code = list(pl.JOURS)[jours.current()]
+            seq = " ".join(ec.token(st) for st in steps)
             status.config(text="ajout dans le Planificateur Windows…", fg=MUTED)
 
             def work():
                 try:
-                    it, _m = pl.add(heure.get(), code, seq.get())
-                    msg, col = f"✅ créneau #{it['id']} ajouté : {pl.describe(it)}", GREEN
+                    it, _m = pl.add(heure.get(), code, seq)
+                    msg, col = f"✅ créneau #{it['id']} programmé : {pl.describe(it)}", GREEN
+                    self.after(0, lambda: (steps.clear(), paint()))
                 except ValueError as e:
                     msg, col = f"❌ {e}", RED
                 self.after(0, lambda: (status.config(text=msg, fg=col), refresh()))
             threading.Thread(target=work, daemon=True).start()
-        Btn(form, "➕ Ajouter", add, bg=YELLOW, padx=14, pady=4).grid(row=2, column=3, sticky="e", padx=10, pady=(0, 8))
+        Btn(wrow, "🗓️ Programmer", add, bg=YELLOW, padx=14, pady=4).pack(side="left")
         status.pack(fill="x", padx=16, pady=(4, 0))
         refresh()
-        win.planning_ui = {"heure": heure, "jours": jours, "seq": seq, "add": add, "status": status, "list": lst}
+        win.planning_ui = {"editor": ed, "steps": steps, "add_step": add_step, "from_chain": from_chain, "heure": heure,
+                           "jours": jours, "add": add, "status": status, "list": lst, "box": box}
         return win
 
     def run_verif(self):
@@ -1482,6 +1652,14 @@ class App(tk.Tk):
     def launch(self):
         if self.proc:
             return
+        ext = encours.read()
+        if ext:
+            if not messagebox.askyesno("Un farm tourne déjà", encours.describe(ext) +
+                                       "\n\nL'arrêter et lancer celui-ci à la place ?"):
+                return
+            encours.stop()
+            self.log(f"⏹ Farm arrêté pour lancer celui-ci : {ext.get('label', '?')}", RED)
+            self.watch_ext(once=True)
         probs = self.problems()
         if probs:
             messagebox.showwarning("Pas encore prêt", "À corriger avant de lancer :\n- " + "\n- ".join(probs))
@@ -1504,7 +1682,7 @@ class App(tk.Tk):
         self.cfg["stamina_refill"] = bool(self.refill_var.get())
         self.cfg["watchdog"] = bool(self.wd_var.get())
         save_cfg(self.cfg)
-        env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+        env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1", MHA_SOURCE="assistant")
         script = self.script_info()[0]          # meme source que la verification des images : un seul endroit a tenir a jour
         cmd = [sys.executable, "-u", str(script)]
         if chain:
@@ -1678,6 +1856,42 @@ class App(tk.Tk):
         if self.proc:
             self.kill_proc()
             self.log("⏹ Arrêt demandé...", RED)
+        elif self.ext:
+            ext = self.ext
+
+            def work():
+                encours.stop()
+                self.after(0, lambda: (self.log(f"⏹ Farm arrêté : {ext.get('label', '?')}", RED), self.watch_ext(once=True)))
+            self.stop_btn.style(GREY, TEXT, enabled=False)
+            threading.Thread(target=work, daemon=True).start()
+
+    def watch_ext(self, once=False):
+        """Toutes les 2 s : un farm lance depuis Discord / le planning / a la main tourne-t-il ? -> barre du bas + Stop."""
+        try:
+            rec = None if self.proc else encours.read()
+            if rec:
+                self.ext = rec
+                total = rec.get("total") or 1
+                self.launch_btn.style(GREY, TEXT, text="⏳  Un farm tourne déjà", enabled=False)
+                self.stop_btn.style(RED, "#ffffff", enabled=True)
+                src = encours.SOURCES.get(rec.get("source"), "?")
+                self.action_lbl.config(text=f"⏳ Farm lancé depuis {src} : {rec.get('label', '?')}", fg=YELLOW)
+                self.run_bar.config(maximum=max(1, total), value=rec.get("done") or 0)
+                self.stats_lbl.config(text=encours.describe(rec) + (f"   ·   {rec['last'][-70:]}" if rec.get("last") else ""))
+            elif self.ext and not self.proc:
+                ext, self.ext = self.ext, None
+                self.stop_btn.style(GREY, TEXT, enabled=False)
+                self.launch_btn.style(GREY, TEXT, text="▶  LANCER  ·  PLUS ULTRA !")
+                self.action_lbl.config(text=f"✔ Le farm lancé depuis {encours.SOURCES.get(ext.get('source'), '?')} "
+                                            f"est terminé ou arrêté : {ext.get('label', '?')}", fg=MUTED)
+                self.run_bar.config(value=0)
+                self.log(f"✔ Farm lancé depuis {encours.SOURCES.get(ext.get('source'), '?')} terminé ou arrêté : "
+                         f"{ext.get('label', '?')}", MUTED)
+                self.refresh_all()
+        except Exception:                                    # noqa: BLE001 - la surveillance ne doit jamais casser l'assistant
+            pass
+        if not once:
+            self.after(2000, self.watch_ext)
 
     def on_close(self):
         if self.proc:

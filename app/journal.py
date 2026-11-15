@@ -23,7 +23,7 @@ KEEP = 10                                  # journaux de session conserves
 ENV_LOG = "MHA_LOG"                        # chemin du journal de la session en cours (transmis aux scripts enfants)
 
 _lines = collections.deque(maxlen=200)     # dernieres lignes affichees (memoire)
-_state = {"started": False, "file": None, "path": None, "script": None, "stats": None}
+_state = {"started": False, "file": None, "path": None, "script": None, "stats": None, "encours": None}
 _lock = threading.Lock()
 
 
@@ -63,6 +63,11 @@ def _record(line):
     if _state["stats"]:
         try:
             _state["stats"].line(line)          # statistiques (stats.py) : progression, recharges, relances...
+        except Exception:                       # noqa: BLE001
+            pass
+    if _state["encours"]:
+        try:
+            _state["encours"].line(line)        # farm en cours, vu par l'assistant et Discord (encours.py)
         except Exception:                       # noqa: BLE001
             pass
     f = _state["file"]
@@ -116,9 +121,30 @@ def start(script):
         _state["stats"] = stats
     except Exception:                           # noqa: BLE001
         pass
+    if not parent and not any(a in sys.argv[1:] for a in ("--test", "--list", "--swipe", "--capture", "--dry")):
+        try:
+            import encours                      # farm en cours partage (assistant / Discord / planning)
+            encours.declare(script, _label(script), _state["path"])
+            _state["encours"] = encours
+        except Exception:                       # noqa: BLE001
+            pass
     sys.stdout = _Tee(sys.stdout)
     sys.stderr = _Tee(sys.stderr)
     return _state["path"]
+
+
+def _label(script):
+    """Nom lisible du farm qui demarre (pour l'assistant et Discord)."""
+    import stats
+    args = sys.argv[1:]
+    if script != "enchainement":
+        return stats.label(script, args)
+    try:
+        import enchainer as ec
+        steps = [ec.label(ec.validate(ec.parse_token(t))) for t in args if not t.startswith("--")]
+        return "Enchaînement : " + " → ".join(steps) if steps else "Enchaînement (sequence.json)"
+    except BaseException:                       # noqa: BLE001 - SystemExit compris
+        return "Enchaînement"
 
 
 def _end(status, message=""):

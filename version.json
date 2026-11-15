@@ -1,6 +1,6 @@
 {
- "version": "2026.11.15-180227",
- "message": "nouvelle version",
+ "version": "2026.11.15-183329",
+ "message": "modif interface planning",
  "files": {
   "GUIDE_AMI.txt": {
    "sha256": "263776b406438b0552f00c1214756ab1873b253a6aa6ceff18ab9c333baaaab1",
@@ -67,8 +67,8 @@
    "size": 4138
   },
   "discord_bot.py": {
-   "sha256": "b8a48c3cf1edf0d64d9d0719d8ae442dcf945773f45a8ec22974d3afbb001aec",
-   "size": 50685
+   "sha256": "6c8798b723fca82a579df49a0fc4b4ceb06f0ba3d34541e74442bb80730dd368",
+   "size": 55191
   },
   "discord_config.example.json": {
    "sha256": "53f945026eb4ae84eeb29e070857dc392ab67408a2316568e3518781938e6e89",
@@ -79,8 +79,12 @@
    "size": 5504
   },
   "enchainer.py": {
-   "sha256": "074c7fe6633085d8043bcffa1201bbac937ef3c7fe40a1358889a2ea83083491",
-   "size": 9339
+   "sha256": "8130748c262f8e15e3ea2ab58aee33b0a54211cb3c9daa072f58d034d787dfca",
+   "size": 12790
+  },
+  "encours.py": {
+   "sha256": "6cd29a619a9b30a19e59ae128147ddb857750fded7a7075de33a2cb637d58986",
+   "size": 6191
   },
   "fastmatch.py": {
    "sha256": "5d84d0aa21cde45438514a2fb95a6933aa87908b71e87d60332d3f7d784ad10a",
@@ -95,8 +99,8 @@
    "size": 10068
   },
   "journal.py": {
-   "sha256": "8e1a3560e2f5a73624953649d72876ddf3ea8423c6704e554ee74c7b8ffc8399",
-   "size": 10414
+   "sha256": "a00d673a7a31d81cb6ba33fc3f223ae2a5dd7404c53c2c7c6fdc07b633e85006",
+   "size": 11643
   },
   "lancer_assistant.bat": {
    "sha256": "29a4bd19b4cd45453954cd7e8d164f4d3a76c8514b5b2452c1b62de5f0bc6a2b",
@@ -119,8 +123,8 @@
    "size": 15102
   },
   "planificateur.py": {
-   "sha256": "13ca04707e9479e4bfceccf5f369c3e621eed70bd6a330b4e3f9628dceba62c3",
-   "size": 11884
+   "sha256": "db17be6c72b58fdcab937973317aff8b157c335723886f6dad9ccb7a89d28cb4",
+   "size": 12286
   },
   "profils.py": {
    "sha256": "5c39723731e70d97af3ca37104efa5f4d3d154b43e47f799ead52b8da88a7e6c",
@@ -139,8 +143,8 @@
    "size": 199
   },
   "setup_assistant.py": {
-   "sha256": "dc1f6be2acd05dd0a49b0c1741acf5b4763ee6b9fe23df7bd80d00cbdc9a143a",
-   "size": 89699
+   "sha256": "0affa3df2f8015a05d1e2e3bd561fbf53081f4ca9a5f12f7bed3b088b373823d",
+   "size": 100393
   },
   "stats.py": {
    "sha256": "96c9da7cb01c3d76fb17c21c6db2550faab7fc229c21f84d2683f3fb0ed79109",

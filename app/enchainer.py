@@ -98,6 +98,77 @@ def label(st):
     return f"Hero Trial ({st['chars']}){h}"
 
 
+# ---------------------------------------------------------------- etapes en clair (menus de l'assistant, Discord, planning)
+SUPPLY_NAMES = {"food": "Cafeteria (nourriture)", "money": "Bounty (argent)", "gear": "Data Collection (matériel)",
+                "card": "Reinforcement (cartes)", "crystals": "Recovery (cristaux)"}
+AA_BOTS = {"deku": "Deku", "bakugo": "Bakugo", "shoto": "Shoto", "momo": "Momo", "ochaco": "Ochaco",
+           "eijiro": "Eijiro", "fumikage": "Fumikage", "denki": "Denki"}
+# choix "mode" proposes partout : cle -> (nom affiche, etape de depart)
+MODES_UI = {
+    "supply":   ("📦 Supply", dict(mode="supply", supply="money", level=4, runs=10)),
+    "nightops": ("🌙 Night Ops", dict(mode="nightops", runs=5)),
+    "hero":     ("🏆 Hero Trial", dict(mode="hero", chars="")),
+    "entrance": ("🏛️ Événement Entrance", dict(mode="whm", event="entrance", level=3, runs=2)),
+    "hallway":  ("🏛️ Événement Hallway", dict(mode="whm", event="hallway", level=3, runs=2)),
+    "library":  ("🏛️ Événement Library", dict(mode="whm", event="library", level=3, runs=2)),
+    "aa":       ("🏢 Agency Assessment", dict(mode="aa", runs=10)),
+}
+
+
+def ui_key(st):
+    """Etape -> cle de MODES_UI."""
+    return st.get("event", "entrance") if st["mode"] == "whm" else st["mode"]
+
+
+def token(st):
+    """Etape (dict) -> ecriture courte, l'inverse de parse_token : supply:money:4:10:deku, aa:10:deku,bakugo:8..."""
+    h = f":{st['hero']}" if st.get("hero") else ""
+    m = st["mode"]
+    if m == "supply":
+        return f"supply:{st['supply']}:{st['level']}:{st['runs']}{h}"
+    if m == "nightops":
+        return f"nightops:{st['runs']}{h}"
+    if m == "whm":
+        return f"{st.get('event', 'entrance')}:{st['level']}:{st['runs']}{h}"
+    if m == "aa":
+        t = f"aa:{st['runs']}"
+        if st.get("bots") or st.get("reset") is not None:
+            t += f":{st.get('bots') or ''}"
+        if st.get("reset") is not None:
+            t += f":{st['reset']}"
+        return t
+    return f"hero:{st['chars']}{h}"
+
+
+def describe(st):
+    """Etape en francais clair : 'Supply Bounty (argent) niveau 4 · 10 multi-runs · Deku combat'."""
+    h = f" · {st['hero'].capitalize()} combat" if st.get("hero") else ""
+    m = st["mode"]
+    if m == "supply":
+        return f"Supply {SUPPLY_NAMES.get(st['supply'], st['supply'])} niveau {st['level']} · {st['runs']} multi-run(s){h}"
+    if m == "nightops":
+        return f"Night Ops · {st['runs']} multi-run(s){h}"
+    if m == "whm":
+        return f"Événement {st.get('event', 'entrance').capitalize()} niveau {st['level']} · {st['runs']} multi-run(s){h}"
+    if m == "aa":
+        bots = ", ".join(AA_BOTS.get(b, b) for b in str(st.get("bots") or "").split(",") if b)
+        reset = f" · reset du permit au floor {st['reset']}" if st.get("reset") else ""
+        return f"Agency Assessment · {st['runs']} combat(s)" + (f" · bots {bots}" if bots else "") + reset
+    chars = ", ".join(c.capitalize() for c in str(st.get("chars", "")).split(",") if c)
+    return f"Hero Trial · {chars}{h}"
+
+
+def describe_tokens(tokens):
+    """['supply:money:4:10', 'nightops:5'] -> '1) ... puis 2) ...' (texte brut si une etape est illisible)."""
+    out = []
+    for i, t in enumerate(tokens, 1):
+        try:
+            out.append(f"{i}) {describe(validate(parse_token(t)))}")
+        except SystemExit:
+            out.append(f"{i}) {t}")
+    return "\n".join(out)
+
+
 def command(st):
     py = [sys.executable, "-u"]
     if st["mode"] == "supply":

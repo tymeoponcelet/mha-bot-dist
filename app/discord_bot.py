@@ -42,6 +42,7 @@ import discord
 from discord import app_commands
 
 import enchainer as ec
+import encours                 # farm en cours, partage avec l'assistant et le planning
 import heroes as hz
 
 BASE = Path(__file__).resolve().parent
@@ -176,7 +177,7 @@ class Runner:
             self.lines.clear()
             self.label, self.emoji, self.t0, self.stopped = label, emoji, time.time(), False
             self.proc = subprocess.Popen(cmd, cwd=BASE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                                         encoding="utf-8", errors="replace", env=dict(ENV, MHA_DISCORD="1"),
+                                         encoding="utf-8", errors="replace", env=dict(ENV, MHA_DISCORD="1", MHA_SOURCE="discord"),
                                          creationflags=NO_WINDOW)
             threading.Thread(target=self._read, args=(self.proc, on_end), daemon=True).start()
 
@@ -425,6 +426,14 @@ async def start_script(interaction, command, label, replace, kind="supply", deta
             await interaction.followup.send(embed=e)
             return
         runner.stop()
+        await asyncio.sleep(2)
+    elif (ext := await asyncio.to_thread(encours.read)):
+        if not replace:
+            e = embed("⏳ Un farm tourne déjà", encours.describe(ext), COLORS["bad"],
+                      tip="Relance avec remplacer: Oui pour l'arrêter et lancer celui-ci, ou /stop d'abord.")
+            await interaction.followup.send(embed=e)
+            return
+        await asyncio.to_thread(encours.stop)
         await asyncio.sleep(2)
     dev = await asyncio.to_thread(emulator_state)
     if not dev:
@@ -767,6 +776,10 @@ async def stop_cmd(interaction: discord.Interaction):
     if runner.stop():
         await interaction.response.send_message(embed=embed("⏹ Script arrêté", f"{emo} **{label}**", COLORS["bad"],
                                                             tip="Le jeu reste où il en est : relance quand tu veux."), ephemeral=EPH)
+    elif (ext := await asyncio.to_thread(encours.stop)):          # lance depuis l'assistant, le planning...
+        await interaction.response.send_message(embed=embed(
+            "⏹ Farm arrêté", f"**{ext.get('label', '?')}**\n(lancé depuis {encours.SOURCES.get(ext.get('source'), '?')})",
+            COLORS["bad"], tip="Le jeu reste où il en est : relance quand tu veux."), ephemeral=EPH)
     elif await asyncio.to_thread(__import__("planificateur").stop_planned):     # farm lance par le planning
         await interaction.response.send_message(embed=embed("⏹ Farm programmé arrêté", "🗓️ lancé par le planning",
                                                             COLORS["bad"], tip="/planning pour voir les créneaux"), ephemeral=EPH)
@@ -790,6 +803,17 @@ async def statut_cmd(interaction: discord.Interaction):
         e = embed(f"{runner.emoji} En cours : {runner.label}",
                   f"{runner.activity()} · depuis **{runner.elapsed()}**{bar}", COLORS["info"],
                   tip="/capture pour voir l'écran · /stop pour arrêter")
+    elif (ext := await asyncio.to_thread(encours.read)):
+        bar = ""
+        if ext.get("total"):
+            n = max(0, min(10, round(10 * ext["done"] / max(1, ext["total"]))))
+            bar = f"\n`{'█' * n}{'░' * (10 - n)}`  **{ext['done']}/{ext['total']}**"
+        step = f"\n🔗 Étape {ext['step']}" if ext.get("step") else ""
+        e = embed(f"⏳ En cours : {ext.get('label', '?')}", encours.describe(ext) + step + bar, COLORS["info"],
+                  tip="/capture pour voir l'écran · /stop pour arrêter")
+        lines = "\n".join(encours.tail(ext))[-1000:].replace("`", "'")
+        if lines:
+            e.add_field(name="Journal", value=f"```\n{lines}\n```", inline=False)
     elif runner.lines:
         e = embed("⏸️ Rien ne tourne", f"Dernier script : {runner.emoji} **{runner.label}**", COLORS["info"],
                   tip="/supply · /nightops · /herotrial · /enchainer")
@@ -797,7 +821,7 @@ async def statut_cmd(interaction: discord.Interaction):
         e = embed("⏸️ Rien ne tourne", "Aucun script lancé depuis le démarrage du bot.", COLORS["info"],
                   tip="/aide si tu ne sais pas par où commencer")
     e.add_field(name="Machine", value=emu, inline=False)
-    if runner.lines:
+    if runner.lines and runner.running:
         e.add_field(name="Journal", value=f"```\n{runner.tail()}\n```", inline=False)
     await interaction.followup.send(embed=e)
 
@@ -820,23 +844,72 @@ PLAN_JOURS = [app_commands.Choice(name="Tous les jours", value="tous"),
               app_commands.Choice(name="Une seule fois (prochaine fois que cette heure arrive)", value="une_fois")]
 
 
+PLAN_MODES = [app_commands.Choice(name=n, value=k) for k, (n, _st) in ec.MODES_UI.items()] + [
+    app_commands.Choice(name="🔗 L'enchaînement préparé dans l'assistant", value="enchainement")]
+
+
+def plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset):
+    """Les menus de /planifier -> une etape validee (SystemExit / ValueError si impossible)."""
+    st = dict(ec.MODES_UI[mode][1])
+    if runs:
+        st["runs"] = runs
+    if mode == "supply":
+        st["supply"] = ressource or st["supply"]
+        st["level"] = niveau or min(4, ec.MAX_LEVEL[st["supply"]])
+    elif st["mode"] == "whm" and niveau:
+        st["level"] = niveau
+    if mode == "hero":
+        chars = [c.strip().lower() for c in (persos or ",".join(cfg_get("hero_chars") or [])).split(",") if c.strip()]
+        if not chars:
+            raise ValueError("Hero Trial : indique les persos à farmer dans « persos » (ex. deku,denki).")
+        st["chars"] = ",".join(chars)
+    if mode == "aa":
+        bots = [b for b in (bot1, bot2) if b]
+        if len(set(bots)) < len(bots):
+            raise ValueError("Agency : choisis deux bots différents.")
+        st["bots"] = ",".join(bots) or None
+        st["reset"] = reset or None
+    elif perso:
+        st["hero"] = perso
+    return ec.validate(st)
+
+
 @cmd(name="planifier", description="🗓️ Programme un farm à une heure fixe (le PC doit rester allumé)")
-@app_commands.describe(heure="Heure, ex. 02:00 ou 7h30", sequence="Étapes comme /enchainer, ex. supply:money:4:10 nightops:5",
-                       jours="Quand le répéter")
-@app_commands.choices(jours=PLAN_JOURS)
-async def planifier_cmd(interaction: discord.Interaction, heure: str, sequence: str, jours: str = "tous"):
+@app_commands.describe(
+    heure="Heure, ex. 02:00 ou 7h30", mode="Quoi farmer (ou l'enchaînement préparé dans l'assistant)",
+    jours="Quand le répéter (défaut : tous les jours)", ressource="Supply : quoi farmer (défaut : Bounty)",
+    niveau="Supply 1-4 / Événement 1-3 (défaut : le plus haut)", runs="Nombre de multi-runs (ou de combats pour Agency)",
+    perso="Qui combat (sinon : celui déjà placé)", persos="Hero Trial : persos à farmer, ex. deku,denki (défaut : assistant)",
+    bot1="Agency : 1er bot", bot2="Agency : 2e bot", reset="Agency : remettre le permit au floor 1 à partir de ce floor",
+    sequence="Avancé : étapes écrites comme /enchainer (remplace les menus)")
+@app_commands.choices(mode=PLAN_MODES, jours=PLAN_JOURS, ressource=SUPPLY_CHOICES, perso=HEROES, bot1=AA_CHOICES,
+                      bot2=AA_CHOICES)
+async def planifier_cmd(interaction: discord.Interaction, heure: str, mode: str = "supply", jours: str = "tous",
+                        ressource: str = None, niveau: app_commands.Range[int, 1, 4] = None,
+                        runs: app_commands.Range[int, 1, 500] = None, perso: str = None, persos: str = None,
+                        bot1: str = None, bot2: str = None, reset: app_commands.Range[int, 2, 30] = None,
+                        sequence: str = None):
     await interaction.response.defer(ephemeral=EPH)
     import planificateur as pl
     try:
-        it, _m = await asyncio.to_thread(pl.add, heure, jours, sequence)
-    except ValueError as e:
+        if sequence:
+            seq = sequence
+        elif mode == "enchainement":
+            steps = [ec.validate(dict(s)) for s in (cfg_get("chain_steps") or [])]
+            if not steps:
+                raise ValueError("L'enchaînement de l'assistant est vide : prépare-le (mode Enchaîner) ou choisis un mode.")
+            seq = " ".join(ec.token(s) for s in steps)
+        else:
+            seq = ec.token(plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset))
+        it, _m = await asyncio.to_thread(pl.add, heure, jours, seq)
+    except (ValueError, SystemExit) as e:
         await interaction.followup.send(embed=embed("❌ Créneau refusé", str(e)[:1500], COLORS["bad"],
-                                                    tip="Syntaxe des étapes : comme /enchainer"))
+                                                    tip="Choisis le mode dans le menu ; les autres options sont facultatives"))
         return
     nxt = (await asyncio.to_thread(pl.next_runs)).get(it["id"], "?")
     await interaction.followup.send(embed=embed(
-        f"🗓️ Farm programmé #{it['id']}", f"**{it['heure']}** · {pl.JOURS[it['jours']].lower()}\n`{' '.join(it['sequence'])}`\n"
-        f"Prochaine exécution : **{nxt}**", COLORS["info"],
+        f"🗓️ Farm programmé #{it['id']}", f"**{it['heure']}** · {pl.JOURS[it['jours']].lower()}\n"
+        f"{ec.describe_tokens(it['sequence'])}\nProchaine exécution : **{nxt}**", COLORS["info"],
         tip="Le PC peut être en veille (il se réveille), pas éteint · /planning pour voir ou supprimer"))
 
 

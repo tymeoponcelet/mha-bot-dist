@@ -69,8 +69,13 @@ def validate(heure, jours, sequence):
     return heure, jours, tokens
 
 
-def describe(it):
-    return (f"#{it['id']}  {it['heure']}  {JOURS.get(it['jours'], it['jours']).lower()}  ·  {' '.join(it['sequence'])}"
+def describe(it, short=False):
+    """'#3  02:00  tous les jours  ·  Supply Bounty (argent) niveau 4 · 10 multi-run(s) → Night Ops · 5 multi-run(s)'."""
+    import enchainer as ec
+    steps = ec.describe_tokens(it["sequence"]).splitlines()
+    steps = [x.split(") ", 1)[-1] for x in steps]
+    seq = " → ".join(steps) if not short else (steps[0] + (f" (+{len(steps) - 1} étape(s))" if len(steps) > 1 else ""))
+    return (f"#{it['id']}  {it['heure']}  {JOURS.get(it['jours'], it['jours']).lower()}  ·  {seq}"
             + ("" if it.get("actif", True) else "  (désactivé)"))
 
 
@@ -234,7 +239,7 @@ def run(i, path=None, dry=False):
     t0 = time.time()
     cmd = [str(Path(sys.executable).with_name("python.exe")) if Path(sys.executable).name.lower() == "pythonw.exe"
            else sys.executable, str(BASE / "enchainer.py"), *tokens] + (["--dry"] if dry else [])
-    env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
+    env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8", MHA_SOURCE="planning")
     env.pop("MHA_LOG", None)
     try:
         p = subprocess.Popen(cmd, cwd=str(BASE), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
