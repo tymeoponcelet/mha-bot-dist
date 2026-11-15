@@ -75,8 +75,20 @@ def describe(it, short=False):
     steps = ec.describe_tokens(it["sequence"]).splitlines()
     steps = [x.split(") ", 1)[-1] for x in steps]
     seq = " → ".join(steps) if not short else (steps[0] + (f" (+{len(steps) - 1} étape(s))" if len(steps) > 1 else ""))
-    return (f"#{it['id']}  {it['heure']}  {JOURS.get(it['jours'], it['jours']).lower()}  ·  {seq}"
+    opts = "".join(f"  ·  {icon} {'oui' if it[k] else 'non'}" for k, icon in (("refill", "🔋"), ("watchdog", "🛡️"))
+                   if it.get(k) is not None)
+    return (f"#{it['id']}  {it['heure']}  {JOURS.get(it['jours'], it['jours']).lower()}  ·  {seq}{opts}"
             + ("" if it.get("actif", True) else "  (désactivé)"))
+
+
+def flags(it):
+    """Options du creneau pour enchainer.py (absentes = reglage general au moment du farm)."""
+    out = []
+    if it.get("refill") is not None:
+        out.append("--refill" if it["refill"] else "--no-refill")
+    if it.get("watchdog") is not None:
+        out.append("--watchdog" if it["watchdog"] else "--no-watchdog")
+    return out
 
 
 # ---------------------------------------------------------------- Planificateur de taches Windows
@@ -152,12 +164,16 @@ def next_time(h):
 
 
 # ---------------------------------------------------------------- ajout / suppression
-def add(heure, jours, sequence, path=None, do_register=True):
-    """-> (creneau, message). ValueError si la demande est invalide."""
+def add(heure, jours, sequence, path=None, do_register=True, refill=None, watchdog=None):
+    """-> (creneau, message). ValueError si la demande est invalide.
+    refill / watchdog : True / False = choix du creneau ; None = reglage general au moment du farm."""
     heure, jours, tokens = validate(heure, jours, sequence)
     items = load(path)
     it = {"id": max([x["id"] for x in items] + [0]) + 1, "heure": heure, "jours": jours, "sequence": tokens,
           "actif": True, "cree": time.strftime("%Y-%m-%d %H:%M")}
+    for k, v in (("refill", refill), ("watchdog", watchdog)):
+        if v is not None:
+            it[k] = bool(v)
     msg = ""
     if do_register:
         ok, msg = register(it, plan_path=path if path else None)
@@ -238,7 +254,7 @@ def run(i, path=None, dry=False):
     _awake(True)
     t0 = time.time()
     cmd = [str(Path(sys.executable).with_name("python.exe")) if Path(sys.executable).name.lower() == "pythonw.exe"
-           else sys.executable, str(BASE / "enchainer.py"), *tokens] + (["--dry"] if dry else [])
+           else sys.executable, str(BASE / "enchainer.py"), *tokens] + flags(it) + (["--dry"] if dry else [])
     env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8", MHA_SOURCE="planning")
     env.pop("MHA_LOG", None)
     try:

@@ -41,7 +41,7 @@ TIMEOUT = 60            # s max pour tout le retour au menu (Retour -> Exit Stag
 
 
 class _T:
-    def __init__(self, path, crop=(0, 0, 1, 1), thr=0.85):
+    def __init__(self, path, crop=(0, 0, 1, 1), thr=0.85, mask_bg=False):
         full = cv2.imread(str(path), cv2.IMREAD_COLOR) if path and Path(path).exists() else None
         self.ok = full is not None
         self.thr = thr
@@ -51,6 +51,8 @@ class _T:
             H, W = full.shape[:2]
             self.size, self.off = (W, H), (int(crop[0] * W), int(crop[1] * H))
             self.img = full[int(crop[1] * H):int(crop[3] * H), int(crop[0] * W):int(crop[2] * W)]
+        # mask_bg : bouton pose sur la ville (le decor change) -> on ne compare que l'icone (fastmatch.background_mask)
+        self.mask = fastmatch.background_mask(self.img) if (self.ok and mask_bg) else None
         fastmatch.prepare(self)                 # reconnaissance rapide (voir fastmatch.py)
 
     def prep(self, img):

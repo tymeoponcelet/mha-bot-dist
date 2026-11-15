@@ -108,7 +108,7 @@ def run_all(adb, device):
     """Toutes les verifications, dans l'ordre d'affichage."""
     out = [check_device(adb, device)]
     dev_ok = out[0][1] != "bad"
-    if dev_ok and not device:
+    if dev_ok and (not device or out[0][1] == "warn"):      # appareil enregistre absent : on verifie celui qui repond
         code, txt = _adb(adb, "devices")
         devs = [l.split()[0] for l in txt.splitlines()[1:] if l.strip().endswith("device")]
         device = devs[0] if devs else None

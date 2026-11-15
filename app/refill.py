@@ -43,7 +43,7 @@ SPEC = {
     "insustam2": dict(crop=(0.04, 0.12, 0.96, 0.88), thr=0.85),
     "morestam":  dict(crop=(0.0, 0.0, 0.22, 0.11), thr=0.85),            # titre "Stamina Supply"
     "closestam": dict(thr=0.80, region=(0.55, 0.0, 1.0, 0.5)),
-    "cadeau":    dict(thr=0.80),
+    "cadeau":    dict(thr=0.80, mask_bg=True),        # pose sur la ville : decor variable -> seul le cadeau est compare
     "code":      dict(thr=0.85),
     "codearea":  dict(crop=(0.03, 0.50, 0.62, 0.78), thr=0.70),          # zone du champ (texte "Please enter...")
     "take":      dict(thr=0.85),
@@ -87,8 +87,8 @@ class Refill:
         self.base = Path(base)
         self.code, self.count = settings()
         self.home = home or nav.Home(shot, tap, log, back=self._back, base=base)
-        self.t = {k: nav._T(self.base / "templates_stamina" / f"{k}.png", crop=s.get("crop", (0, 0, 1, 1)), thr=s["thr"])
-                  for k, s in SPEC.items()}
+        self.t = {k: nav._T(self.base / "templates_stamina" / f"{k}.png", crop=s.get("crop", (0, 0, 1, 1)), thr=s["thr"],
+                            mask_bg=s.get("mask_bg", False)) for k, s in SPEC.items()}
         self.exit_t = nav._T(self.base / "templates_hero" / "exit.png", crop=(0.1, 0.2, 0.9, 0.8), thr=0.80)
         self.typing = False                                     # True pendant la saisie du code : autoclick COUPE
         self.done_t = 0.0                                       # heure de la derniere recharge terminee

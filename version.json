@@ -1,6 +1,6 @@
 {
- "version": "2026.11.15-183329",
- "message": "modif interface planning",
+ "version": "2026.11.15-215547",
+ "message": "",
  "files": {
   "GUIDE_AMI.txt": {
    "sha256": "263776b406438b0552f00c1214756ab1873b253a6aa6ceff18ab9c333baaaab1",
@@ -67,28 +67,32 @@
    "size": 4138
   },
   "discord_bot.py": {
-   "sha256": "6c8798b723fca82a579df49a0fc4b4ceb06f0ba3d34541e74442bb80730dd368",
-   "size": 55191
+   "sha256": "1122f9c4bc616cfbe979ab8612bbcabe0fbb881c31a874ff9eb00622b8f9f4b6",
+   "size": 53267
   },
   "discord_config.example.json": {
    "sha256": "53f945026eb4ae84eeb29e070857dc392ab67408a2316568e3518781938e6e89",
    "size": 226
+  },
+  "discord_ui.py": {
+   "sha256": "d9bc39f5094c9e425ab5bcbb139be19018ad528b1bfcba9bad03025a105e3050",
+   "size": 31583
   },
   "emulateur.py": {
    "sha256": "66434d0dc187444cabf51d6af90cf9d3be233d177e3179d8a02d2d5555a6a07a",
    "size": 5504
   },
   "enchainer.py": {
-   "sha256": "8130748c262f8e15e3ea2ab58aee33b0a54211cb3c9daa072f58d034d787dfca",
-   "size": 12790
+   "sha256": "4fad3136aebbae0c3052e116c9ccfb259085005d1a8ba91f17eafde82d61b253",
+   "size": 14550
   },
   "encours.py": {
    "sha256": "6cd29a619a9b30a19e59ae128147ddb857750fded7a7075de33a2cb637d58986",
    "size": 6191
   },
   "fastmatch.py": {
-   "sha256": "5d84d0aa21cde45438514a2fb95a6933aa87908b71e87d60332d3f7d784ad10a",
-   "size": 6211
+   "sha256": "295ab48ba506a04fff24a5a27b69d42b25ced2058318b79d00b845a241c3a6cc",
+   "size": 7221
   },
   "heroes.py": {
    "sha256": "ee7de671cb0f98a615771193ea4c3b2078742a22d2d010b7cbb92b9b458a1e18",
@@ -119,20 +123,20 @@
    "size": 4842
   },
   "nav.py": {
-   "sha256": "a7a52682cd99a2e87ea9a4a3ddd7b18b958e70d9d1fc05142b1ed6d9fb501b0f",
-   "size": 15102
+   "sha256": "bed79cb26f4e73b08a19e731d18470cf34fed9e55c7e9d05d84eb3fc4cd0a884",
+   "size": 15328
   },
   "planificateur.py": {
-   "sha256": "db17be6c72b58fdcab937973317aff8b157c335723886f6dad9ccb7a89d28cb4",
-   "size": 12286
+   "sha256": "fd0c008946cd80c11e21a61b325d4c9ae4304512006d9398ed9090ec06e65c8b",
+   "size": 13071
   },
   "profils.py": {
    "sha256": "5c39723731e70d97af3ca37104efa5f4d3d154b43e47f799ead52b8da88a7e6c",
    "size": 3570
   },
   "refill.py": {
-   "sha256": "5071e9487043cbad04a7fb47c6b207e89cccd83cf73610f7d7b4bab0fe143b7f",
-   "size": 19276
+   "sha256": "b84a72e49309325438211e445ea95df3f0596881350b45891aec5f73f41003ce",
+   "size": 19407
   },
   "requirements.txt": {
    "sha256": "c7af4b65cf9bdcc9f34344377b96fdad20647f10b0210413d299ef00f01337de",
@@ -143,8 +147,8 @@
    "size": 199
   },
   "setup_assistant.py": {
-   "sha256": "0affa3df2f8015a05d1e2e3bd561fbf53081f4ca9a5f12f7bed3b088b373823d",
-   "size": 100393
+   "sha256": "041dfd9217db6d849211a239e03951fce754b670ac50d6f10b2c87617054c533",
+   "size": 101149
   },
   "stats.py": {
    "sha256": "96c9da7cb01c3d76fb17c21c6db2550faab7fc229c21f84d2683f3fb0ed79109",
@@ -851,8 +855,8 @@
    "size": 13889
   },
   "verif.py": {
-   "sha256": "d564d6285ec7840de8641bae529abb69dd437aefe1193dfd19ad6f881af5ada3",
-   "size": 5576
+   "sha256": "33b5ae99604ff4cd014807956f9d3a2a7e117056e9d61ce48eac9cd09d45dd59",
+   "size": 5665
   },
   "watchdog.py": {
    "sha256": "edba49b498384fda6e6a7785894eaee732ebd245a81bff3f13c60480ecabeae5",

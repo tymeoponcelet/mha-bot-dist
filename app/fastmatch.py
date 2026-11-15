@@ -42,12 +42,26 @@ def screen_cache(screen):
     return _CACHE["gray"], _CACHE["small"]
 
 
-def peak(scr, tpl):
-    """-> (score, (x, y)) du meilleur endroit, ou None si l'image est plus grande que la zone."""
+def peak(scr, tpl, mask=None):
+    """-> (score, (x, y)) du meilleur endroit, ou None si l'image est plus grande que la zone.
+    mask : ne compare que les pixels de l'icone (fond de l'image de reference ignore, voir background_mask)."""
     if scr is None or tpl is None or scr.shape[0] < tpl.shape[0] or scr.shape[1] < tpl.shape[1]:
         return None
-    _, score, _, loc = cv2.minMaxLoc(cv2.matchTemplate(scr, tpl, cv2.TM_CCOEFF_NORMED))
-    return (0.0 if np.isnan(score) else float(score)), loc
+    if mask is None:
+        _, score, _, loc = cv2.minMaxLoc(cv2.matchTemplate(scr, tpl, cv2.TM_CCOEFF_NORMED))
+        return (0.0 if np.isnan(score) else float(score)), loc
+    res = np.nan_to_num(cv2.matchTemplate(scr, tpl, cv2.TM_CCOEFF_NORMED, mask=mask), nan=-1.0, posinf=-1.0, neginf=-1.0)
+    _, score, _, loc = cv2.minMaxLoc(res)
+    return float(score), loc
+
+
+def background_mask(img, tol=60):
+    """Masque des pixels de l'ICONE : tout ce qui differe de la couleur du bord (le fond uni de la decoupe).
+    Pour les boutons poses sur la ville : le decor change a chaque deplacement, on ne le compare plus."""
+    border = np.concatenate([img[0], img[-1], img[:, 0], img[:, -1]]).astype(np.int32)
+    bg = np.median(border, axis=0)
+    m = (np.abs(img.astype(np.int32) - bg).sum(axis=2) > tol).astype(np.uint8) * 255
+    return cv2.dilate(m, np.ones((3, 3), np.uint8))
 
 
 def prepare(t):
@@ -55,6 +69,8 @@ def prepare(t):
     t.last = None
     t.gimg = t.simg = None
     if t.img is None or t.img.ndim != 3:       # image comparee en masque blanc (bouton AUTO) : deja en 1 canal
+        return
+    if getattr(t, "mask", None) is not None:   # fond masque : comparaison couleur complete (pas de reperage rapide)
         return
     t.gimg = cv2.cvtColor(t.img, cv2.COLOR_BGR2GRAY)
     h, w = (max(1, int(round(v * COARSE_SCALE))) for v in t.gimg.shape[:2])
@@ -73,7 +89,7 @@ def exact(t, screen, x, y):
 
 def full(t, screen):
     """Ancienne methode : comparaison couleur sur TOUTE la capture."""
-    r = peak(t.prep(screen), t.img)
+    r = peak(t.prep(screen), t.img, getattr(t, "mask", None))
     return (0.0, (0, 0)) if r is None else r
 
 

@@ -209,6 +209,25 @@ class StepEditor(tk.Frame):
             self.w["bot1"] = self._combo(row, "Bot 1", bots, 10, 1)
             self.w["bot2"] = self._combo(row, "Bot 2", bots, 10, 2)
             self.w["reset"] = self._combo(row, "Reset du permit au floor", ["jamais"] + [str(i) for i in range(2, 21)], 7, 0)
+            # persos reserves pour les hauts floors : pre-coches comme dans l'assistant (mode Agency)
+            cfg = load_cfg()
+            pre = set(cfg.get("aa_reserved") or [])
+            rrow = tk.Frame(self.opts, bg=self.bg)
+            rrow.pack(fill="x", pady=(6, 0))
+            floors = [str(i) for i in range(2, 31)]
+            rf = str(int(cfg.get("aa_reserve_floor", 10) or 10))
+            self.w["resfloor"] = self._combo(rrow, "Persos réservés à partir du floor", floors, 4,
+                                             floors.index(rf) if rf in floors else floors.index("10"))
+            self.w["reserve"] = {}
+            row = None
+            for i, c in enumerate(ec.aa_chars()):
+                if i % 9 == 0:
+                    row = tk.Frame(self.opts, bg=self.bg)
+                    row.pack(fill="x", padx=(12, 0))
+                v = tk.BooleanVar(value=c in pre)
+                tk.Checkbutton(row, text=ec.aa_name(c), variable=v, bg=self.bg, fg=TEXT, selectcolor=BG,
+                               activebackground=self.bg, activeforeground=TEXT, font=F(9)).pack(side="left")
+                self.w["reserve"][c] = v
         if k == "hero":
             tk.Label(row, text="Persos à farmer", bg=self.bg, fg=MUTED, font=F(9, True)).pack(side="left", padx=(0, 6))
             self.w["chars"] = {}
@@ -257,6 +276,8 @@ class StepEditor(tk.Frame):
                 raise ValueError("Agency : choisis deux bots différents.")
             st["bots"] = ",".join(bots) or None
             st["reset"] = None if self.w["reset"].current() == 0 else int(self.w["reset"].get())
+            st["reserve"] = ",".join(c for c, v in self.w["reserve"].items() if v.get()) or "aucun"
+            st["resfloor"] = int(self.w["resfloor"].get())
         elif self.w["hero"].current() > 0:
             st["hero"] = self.heroes[self.w["hero"].current() - 1]
         try:
@@ -592,11 +613,9 @@ class App(tk.Tk):
         top.pack(fill="x", padx=14, pady=(8, 2))
         tk.Label(top, text="Étape à ajouter", bg=CARD, fg=TEXT, font=F(11, True)).pack(side="left")
         self.chain_btns = {}
-        for key, label in (("supply", "📦 Supply"), ("night", "🌙 Night Ops"), ("hero", "🏆 Hero Trial")):
-            b = Btn(top, label, lambda k=key: self.set_chain_type(k), bg=GREY, fg=TEXT, size=10, padx=12, pady=4)
-            b.pack(side="left", padx=(8, 0))
-            self.chain_btns[key] = b
-        tk.Label(self.chain_opts, text="Règle l'étape ci-dessous (mode, niveau, lancements, perso), puis clique sur « Ajouter ». "
+        self.chain_editor = StepEditor(self.chain_opts)          # tous les modes : Supply ... Agency (menus)
+        self.chain_editor.pack(fill="x", padx=14, pady=(4, 4))
+        tk.Label(self.chain_opts, text="Règle l'étape ci-dessus (mode, niveau, lancements, perso), puis clique sur « Ajouter ». "
                  "Les étapes s'exécutent dans l'ordre ; le bot revient au menu principal entre deux étapes.",
                  bg=CARD, fg=MUTED, font=F(8), anchor="w", justify="left", wraplength=800).pack(fill="x", padx=14, pady=(0, 2))
 
@@ -929,20 +948,11 @@ class App(tk.Tk):
 
     # ================= enchainement =================
     def step_text(self, st):
-        who = f"  ·  🦸 {hz.pretty(st['hero'])}" if st.get("hero") else ""
-        if st["mode"] == "supply":
-            return f"📦 Supply {SUPPLY_MODES[st['supply']]} niv. {st['level']}  ×{st['runs']}{who}"
-        if st["mode"] == "nightops":
-            return f"🌙 Night Ops  ×{st['runs']}{who}"
-        return f"🏆 Hero Trial : {', '.join(c.capitalize() for c in st['chars'].split(','))}{who}"
+        icon = ec.MODES_UI[ec.ui_key(st)][0].split()[0]
+        return f"{icon} {ec.describe(st)}"
 
     def step_token(self, st):
-        who = f":{st['hero']}" if st.get("hero") else ""
-        if st["mode"] == "supply":
-            return f"supply:{st['supply']}:{st['level']}:{st['runs']}{who}"
-        if st["mode"] == "nightops":
-            return f"nightops:{st['runs']}{who}"
-        return f"hero:{st['chars']}{who}"
+        return ec.token(st)
 
     def save_chain(self):
         self.cfg["chain_steps"] = [{k: v for k, v in st.items() if v is not None} for st in self.chain_steps]
@@ -961,16 +971,11 @@ class App(tk.Tk):
     def add_step(self):
         if self.proc:
             return
-        t = self.chain_type
-        if t == "supply":
-            st = dict(mode="supply", supply=self.sup_mode, level=self.sup_level, runs=self.runs, hero=self.pick)
-        elif t == "night":
-            st = dict(mode="nightops", runs=self.runs, hero=self.pick)
-        else:
-            if not self.chosen():
-                messagebox.showwarning("Hero Trial", "Coche au moins un perso à farmer.")
-                return
-            st = dict(mode="hero", chars=",".join(self.chosen()), hero=self.pick)
+        try:
+            st = self.chain_editor.get()
+        except ValueError as e:
+            messagebox.showwarning("Étape incomplète", str(e))
+            return
         self.chain_steps.append(st)
         self.save_chain()
         self.paint_steps()
@@ -1024,6 +1029,11 @@ class App(tk.Tk):
             return HERO_BOT, HERO_TPL, HERO_REQUIRED + [f"{c}.png" for c in st["chars"].split(",") if c], False
         if st["mode"] == "nightops":
             return NIGHT_BOT, NIGHT_TPL, NIGHT_REQUIRED, False
+        if st["mode"] == "whm":
+            _n, banner, card = WHM_EVENTS[st.get("event", "entrance")]
+            return WHM_BOT, WHM_TPL, WHM_REQUIRED + [banner, f"{card}{st['level']}.png"], False
+        if st["mode"] == "aa":
+            return AA_BOT, AA_TPL, AA_REQUIRED + [f"{b}.png" for b in str(st.get("bots") or "").split(",") if b], False
         m = st["supply"]
         return SUPPLY_BOT, SUPPLY_TPL, ["supply.png", f"{m}.png", f"lvl{m}.png", "confirm.png", "continuechall.png"] + SUPPLY_COMMON, True
 
@@ -1041,7 +1051,7 @@ class App(tk.Tk):
                     seen.add((tdir.name, n))
                     if not ((tdir / n).exists() or (sup and (NIGHT_TPL / n).exists())):
                         miss.append(f"{tdir.name}/{n}")
-                if not (CHAR_TPL / f"{st.get('hero') or self.pick}.png").exists():
+                if st["mode"] != "aa" and not (CHAR_TPL / f"{st.get('hero') or self.pick}.png").exists():
                     miss.append(f"templates_chars/{st.get('hero') or self.pick}.png")
             if not self.chain_steps:
                 miss.append("(aucune étape dans le plan)")
@@ -1080,7 +1090,7 @@ class App(tk.Tk):
 
     def apply_mode(self):
         chain = self.mode == "chain"
-        hero = self.mode == "hero" or (chain and self.chain_type == "hero")
+        hero = self.mode == "hero"
         if not hero:
             self.runs = self.run_vals[self.mode]
             self.runs_lbl.config(text=str(self.runs))
@@ -1104,17 +1114,7 @@ class App(tk.Tk):
         for f in (self.story_opts, self.hero_opts, self.supply_opts, self.whm_opts, self.aa_opts, self.chain_opts, self.chain_list):
             f.pack_forget()
         if chain:
-            for key, b in self.chain_btns.items():
-                b.style(YELLOW if key == self.chain_type else GREY, DARK if key == self.chain_type else TEXT)
             self.chain_opts.pack(fill="x", after=self.mode_row)
-            if self.chain_type == "supply":
-                self.paint_supply()
-                self.supply_opts.pack(fill="x", after=self.chain_opts)
-                self.story_opts.pack(fill="x", after=self.supply_opts)
-            elif self.chain_type == "night":
-                self.story_opts.pack(fill="x", after=self.chain_opts)
-            else:
-                self.hero_opts.pack(fill="x", after=self.chain_opts)
         elif self.mode == "supply":
             self.paint_supply()
             self.supply_opts.pack(fill="x", after=self.mode_row)
@@ -1470,7 +1470,7 @@ class App(tk.Tk):
 
             def work():
                 try:
-                    it, _m = pl.add(heure.get(), code, seq)
+                    it, _m = pl.add(heure.get(), code, seq, refill=refill_v.get(), watchdog=wd_v.get())
                     msg, col = f"✅ créneau #{it['id']} programmé : {pl.describe(it)}", GREEN
                     self.after(0, lambda: (steps.clear(), paint()))
                 except ValueError as e:
@@ -1478,9 +1478,17 @@ class App(tk.Tk):
                 self.after(0, lambda: (status.config(text=msg, fg=col), refresh()))
             threading.Thread(target=work, daemon=True).start()
         Btn(wrow, "🗓️ Programmer", add, bg=YELLOW, padx=14, pady=4).pack(side="left")
+        orow = tk.Frame(form, bg=CARD)                           # options du creneau (au depart : reglage general)
+        orow.pack(fill="x", padx=10, pady=(0, 10))
+        refill_v = tk.BooleanVar(value=bool(self.cfg.get("stamina_refill", False)))
+        wd_v = tk.BooleanVar(value=bool(self.cfg.get("watchdog", False)))
+        for txt, var in (("🔋 Recharge de stamina (code cadeau)", refill_v), ("🛡️ Chien de garde (maintenance / blocage)", wd_v)):
+            tk.Checkbutton(orow, text=txt, variable=var, bg=CARD, fg=TEXT, selectcolor=BG, activebackground=CARD,
+                           activeforeground=TEXT, font=F(10, True)).pack(side="left", padx=(0, 18))
         status.pack(fill="x", padx=16, pady=(4, 0))
         refresh()
         win.planning_ui = {"editor": ed, "steps": steps, "add_step": add_step, "from_chain": from_chain, "heure": heure,
+                           "refill": refill_v, "watchdog": wd_v,
                            "jours": jours, "add": add, "status": status, "list": lst, "box": box}
         return win
 
@@ -1666,7 +1674,7 @@ class App(tk.Tk):
             return
         hero = self.mode == "hero"
         chain = self.mode == "chain"
-        if not hero and not (chain and self.chain_type == "hero"):
+        if not hero:
             self.run_vals[self.mode] = self.runs
         self.cfg["max_runs"] = self.run_vals["story"]
         self.cfg["whm_runs"] = self.run_vals["whm"]
@@ -1766,7 +1774,7 @@ class App(tk.Tk):
         if self.mode == "hero" or (self.mode == "chain" and self.step_mode == "hero"):
             self.on_hero_line(line)
             return
-        m = re.search(r"\] (\w+) \(.*\| run (\d+)/(\d+)", line)
+        m = re.search(r"\] (\w+) \(.*\| (?:multi-)?run (\d+)/(\d+)", line)
         if m:
             name, done, total = m.group(1), int(m.group(2)), int(m.group(3))
             self.done, self.total = done, total

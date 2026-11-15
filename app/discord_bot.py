@@ -43,6 +43,7 @@ from discord import app_commands
 
 import enchainer as ec
 import encours                 # farm en cours, partage avec l'assistant et le planning
+import discord_ui              # boutons, menus, tableau de bord
 import heroes as hz
 
 BASE = Path(__file__).resolve().parent
@@ -268,21 +269,21 @@ def embed(title, desc="", color=COLORS["info"], tip=None):
     return e
 
 
-async def send_owner(e, files=()):
+async def send_owner(e, files=(), view=None):
     """Envoie un message dans le salon des resultats (s'il est regle), sinon en prive au proprietaire."""
     def fl():
         return [discord.File(str(f), filename=f.name) for f in files]
     if CHANNEL_ID:                                       # annonce dans un salon : tout le monde la voit
         try:
             ch = client.get_channel(CHANNEL_ID) or await client.fetch_channel(CHANNEL_ID)
-            await ch.send(embed=e, files=fl())
+            await ch.send(embed=e, files=fl(), **({"view": view} if view else {}))
             return
         except Exception as ex:
             print(f"(!) Salon {CHANNEL_ID} inaccessible ({ex}) : j'envoie un message privé à la place.")
     for uid in sorted(ALLOWED)[:1]:
         try:
             user = await client.fetch_user(uid)
-            await user.send(embed=e, files=fl())
+            await user.send(embed=e, files=fl(), **({"view": view} if view else {}))
         except Exception as ex:
             print("Message privé impossible :", ex)
 
@@ -342,7 +343,7 @@ async def send_incident(d, info):
     files = incident_files(d)
     if any(f.name == "capture.png" for f in files):
         e.set_image(url="attachment://capture.png")
-    await send_owner(e, files)
+    await send_owner(e, files, discord_ui.Actions(["capture", "statut", "stop"] if live else ["capture", "relancer"]))
     mark_sent(d)
 
 
@@ -401,7 +402,7 @@ async def notify(code, stopped):
         files = incident_files(d)
         if any(f.name == "capture.png" for f in files):
             e.set_image(url="attachment://capture.png")
-    await send_owner(e, files)
+    await send_owner(e, files, discord_ui.Actions(["relancer", "capture", "stats"]))
     for d, _i in mine:
         mark_sent(d)
 
@@ -443,12 +444,13 @@ async def start_script(interaction, command, label, replace, kind="supply", deta
         await interaction.followup.send(embed=e)
         return
     runner.start(command, label, on_end, MODE_EMOJI.get(kind, "🎮"))
+    discord_ui.remember(command, label, kind, details)                # pour 🔁 Relancer pareil
     e = embed(f"{MODE_EMOJI.get(kind, '🎮')} C'est parti : {label}", details, COLORS.get(kind, COLORS["info"]),
               tip="Je t'écris en privé quand c'est fini · /statut · /capture · /stop")
     e.add_field(name="Options", value=options_line(refill, watchdog), inline=False)
     e.add_field(name="Et maintenant ?", value="Le script revient d'abord au **menu principal** tout seul, "
                 "puis il place le perso et lance le farm. Tu peux ranger ton téléphone 🙂", inline=False)
-    await interaction.followup.send(embed=e)
+    await interaction.followup.send(embed=e, view=discord_ui.Actions(["statut", "capture", "stop"]))
 
 
 @client.event
@@ -458,6 +460,8 @@ async def on_ready():
     LOOP = asyncio.get_running_loop()
     if first:
         LOOP.create_task(incident_watch())                # incidents (logs/incidents) -> Discord
+        discord_ui.register(client)                       # boutons des anciens messages : toujours actifs
+        LOOP.create_task(discord_ui.panel_loop())         # tableau de bord (/panneau) mis a jour tout seul
     if SYNC:
         try:
             await (tree.sync(guild=GUILD) if GUILD else tree.sync())
@@ -770,22 +774,20 @@ async def reglages_cmd(interaction: discord.Interaction):
 
 
 # ---------------------------------------------------------------- /stop /statut /capture
+@cmd(name="farm", description="🎮 Lancer un farm avec des menus : mode, ressource, niveau, perso, nombre de runs")
+async def farm_cmd(interaction: discord.Interaction):
+    await discord_ui.open_farm(interaction)
+
+
+@cmd(name="panneau", description="🎮 Tableau de bord en direct : farm en cours, progression, boutons Stop / Capture")
+async def panneau_cmd(interaction: discord.Interaction):
+    await discord_ui.open_panel(interaction)
+
+
 @cmd(name="stop", description="⏹ Arrête le script en cours")
 async def stop_cmd(interaction: discord.Interaction):
-    label, emo = runner.label, runner.emoji
-    if runner.stop():
-        await interaction.response.send_message(embed=embed("⏹ Script arrêté", f"{emo} **{label}**", COLORS["bad"],
-                                                            tip="Le jeu reste où il en est : relance quand tu veux."), ephemeral=EPH)
-    elif (ext := await asyncio.to_thread(encours.stop)):          # lance depuis l'assistant, le planning...
-        await interaction.response.send_message(embed=embed(
-            "⏹ Farm arrêté", f"**{ext.get('label', '?')}**\n(lancé depuis {encours.SOURCES.get(ext.get('source'), '?')})",
-            COLORS["bad"], tip="Le jeu reste où il en est : relance quand tu veux."), ephemeral=EPH)
-    elif await asyncio.to_thread(__import__("planificateur").stop_planned):     # farm lance par le planning
-        await interaction.response.send_message(embed=embed("⏹ Farm programmé arrêté", "🗓️ lancé par le planning",
-                                                            COLORS["bad"], tip="/planning pour voir les créneaux"), ephemeral=EPH)
-    else:
-        await interaction.response.send_message(embed=embed("Rien à arrêter", "Aucun script ne tourne en ce moment.", COLORS["info"],
-                                                            tip="/supply · /nightops · /herotrial pour en lancer un"), ephemeral=EPH)
+    await discord_ui.do_stop(interaction)
+
 
 
 @cmd(name="statut", description="📊 Ce qui tourne, depuis quand, et les derniers messages")
@@ -848,7 +850,7 @@ PLAN_MODES = [app_commands.Choice(name=n, value=k) for k, (n, _st) in ec.MODES_U
     app_commands.Choice(name="🔗 L'enchaînement préparé dans l'assistant", value="enchainement")]
 
 
-def plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset):
+def plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset, reserves=None, floor_reserve=None):
     """Les menus de /planifier -> une etape validee (SystemExit / ValueError si impossible)."""
     st = dict(ec.MODES_UI[mode][1])
     if runs:
@@ -869,6 +871,9 @@ def plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset):
             raise ValueError("Agency : choisis deux bots différents.")
         st["bots"] = ",".join(bots) or None
         st["reset"] = reset or None
+        if reserves is not None:                               # sinon : reglage de l'assistant au moment du farm
+            st["reserve"] = reserves.replace(" ", "") or "aucun"
+        st["resfloor"] = floor_reserve or None
     elif perso:
         st["hero"] = perso
     return ec.validate(st)
@@ -881,14 +886,19 @@ def plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset):
     niveau="Supply 1-4 / Événement 1-3 (défaut : le plus haut)", runs="Nombre de multi-runs (ou de combats pour Agency)",
     perso="Qui combat (sinon : celui déjà placé)", persos="Hero Trial : persos à farmer, ex. deku,denki (défaut : assistant)",
     bot1="Agency : 1er bot", bot2="Agency : 2e bot", reset="Agency : remettre le permit au floor 1 à partir de ce floor",
-    sequence="Avancé : étapes écrites comme /enchainer (remplace les menus)")
+    reserves="Agency : persos réservés aux hauts floors, ex. mirio,hawks (aucun = personne ; vide = assistant)",
+    floor_reserve="Agency : floor à partir duquel jouer les réservés (défaut : 10)",
+    sequence="Avancé : étapes écrites comme /enchainer (remplace les menus)",
+    stamina="Recharger la stamina avec le code quand il n'y en a plus. Vide = réglage général au moment du farm",
+    gardien="Relancer le jeu si maintenance ou blocage. Vide = réglage général au moment du farm")
 @app_commands.choices(mode=PLAN_MODES, jours=PLAN_JOURS, ressource=SUPPLY_CHOICES, perso=HEROES, bot1=AA_CHOICES,
                       bot2=AA_CHOICES)
 async def planifier_cmd(interaction: discord.Interaction, heure: str, mode: str = "supply", jours: str = "tous",
                         ressource: str = None, niveau: app_commands.Range[int, 1, 4] = None,
                         runs: app_commands.Range[int, 1, 500] = None, perso: str = None, persos: str = None,
                         bot1: str = None, bot2: str = None, reset: app_commands.Range[int, 2, 30] = None,
-                        sequence: str = None):
+                        reserves: str = None, floor_reserve: app_commands.Range[int, 1, 99] = None,
+                        sequence: str = None, stamina: bool = None, gardien: bool = None):
     await interaction.response.defer(ephemeral=EPH)
     import planificateur as pl
     try:
@@ -900,8 +910,8 @@ async def planifier_cmd(interaction: discord.Interaction, heure: str, mode: str 
                 raise ValueError("L'enchaînement de l'assistant est vide : prépare-le (mode Enchaîner) ou choisis un mode.")
             seq = " ".join(ec.token(s) for s in steps)
         else:
-            seq = ec.token(plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset))
-        it, _m = await asyncio.to_thread(pl.add, heure, jours, seq)
+            seq = ec.token(plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset, reserves, floor_reserve))
+        it, _m = await asyncio.to_thread(pl.add, heure, jours, seq, refill=stamina, watchdog=gardien)
     except (ValueError, SystemExit) as e:
         await interaction.followup.send(embed=embed("❌ Créneau refusé", str(e)[:1500], COLORS["bad"],
                                                     tip="Choisis le mode dans le menu ; les autres options sont facultatives"))
@@ -909,7 +919,10 @@ async def planifier_cmd(interaction: discord.Interaction, heure: str, mode: str 
     nxt = (await asyncio.to_thread(pl.next_runs)).get(it["id"], "?")
     await interaction.followup.send(embed=embed(
         f"🗓️ Farm programmé #{it['id']}", f"**{it['heure']}** · {pl.JOURS[it['jours']].lower()}\n"
-        f"{ec.describe_tokens(it['sequence'])}\nProchaine exécution : **{nxt}**", COLORS["info"],
+        f"{ec.describe_tokens(it['sequence'])}\nProchaine exécution : **{nxt}**"
+        + "".join(f"\n{icon} {name} : **{'oui' if it[k] else 'non'}**" for k, icon, name in
+                  (("refill", "🔋", "Recharge de stamina"), ("watchdog", "🛡️", "Chien de garde")) if it.get(k) is not None),
+        COLORS["info"],
         tip="Le PC peut être en veille (il se réveille), pas éteint · /planning pour voir ou supprimer"))
 
 
@@ -927,62 +940,26 @@ async def planning_cmd(interaction: discord.Interaction, supprimer: int = 0):
     nxt = await asyncio.to_thread(pl.next_runs)
     lines = [pl.describe(it) + f"  ·  prochaine : {nxt.get(it['id'], '⚠️ tâche Windows absente')}" for it in items]
     await interaction.followup.send(embed=embed("🗓️ Farms programmés", ("\n".join(lines) or "Aucun pour l'instant.")[:3900],
-                                                COLORS["info"], tip="/planifier pour en ajouter · /planning supprimer:N"))
+                                                COLORS["info"], tip="/planifier pour en ajouter · menu ci-dessous pour supprimer"),
+                                    **({"view": discord_ui.PlanningView(items)} if items else {}))
 
 
 # ---------------------------------------------------------------- /stats
 @cmd(name="stats", description="📊 Statistiques des farms : runs, temps, réussite, dernières sessions")
 @app_commands.describe(jours="Sur combien de jours (1 à 90, défaut 7)")
 async def stats_cmd(interaction: discord.Interaction, jours: app_commands.Range[int, 1, 90] = 7):
-    import stats
-    s = await asyncio.to_thread(stats.summary, jours)
-    t = s["total"]
-    e = embed(f"📊 Statistiques : {jours} dernier{'s' if jours > 1 else ''} jour{'s' if jours > 1 else ''}",
-              f"**{t['runs']} runs** en **{t['sessions']} session(s)** · {stats.hms(t['duree'])} de farm · "
-              f"**{t['reussite']} %** finies\n🔋 {t['recharges']} recharge(s) · 🛡️ {t['relances']} relance(s) · "
-              f"🔄 {t['reprises']} reprise(s)", COLORS["info"], tip="Historique complet : bouton 📊 Stats de l'assistant")
-    for m, a in list(s["modes"].items())[:10]:
-        e.add_field(name=m, value=f"{a['runs']} runs · {a['sessions']} session(s) · {stats.hms(a['duree'])} · {a['reussite']} %",
-                    inline=False)
-    last = [stats.describe(x) for x in stats.summary(0)["dernieres"][:5]]
-    e.add_field(name="Dernières sessions", value=("\n".join(last) or "aucune pour l'instant")[:1024], inline=False)
-    await interaction.response.send_message(embed=e, ephemeral=EPH)
+    await interaction.response.send_message(embed=await asyncio.to_thread(discord_ui.stats_embed, jours), ephemeral=EPH,
+                                            view=discord_ui.Actions(["statut", "capture"]))
+
 
 
 # ---------------------------------------------------------------- /aide
 @cmd(name="aide", description="❓ Comment ça marche : les commandes, les persos, les options")
 async def aide_cmd(interaction: discord.Interaction):
-    e = embed("❓ Le bot MHA en 2 minutes",
-              "Le PC et MuMu (avec le jeu ouvert) doivent rester allumés. Tout se pilote d'ici.\n"
-              "Un seul script à la fois. Les réponses sont privées : personne d'autre ne les voit.", COLORS["info"],
-              tip="Astuce : tape / puis le début du nom, Discord te propose la suite.")
-    e.add_field(name="🎮 Lancer un farm", value=(
-        "**/supply** — quoi farmer, niveau, nombre de multi-runs\n"
-        "**/nightops** — nombre de multi-runs\n"
-        "**/whm** — les événements WHM : Entrance, Hallway ou Library\n"
-        "**/aa** — Agency Assessment : combats, bots, reset du permit\n"
-        "**/herotrial** — les persos à farmer\n"
-        "**/enchainer** — plusieurs modes à la suite\n"
-        "*Chaque commande n'affiche que ses propres options.*"), inline=False)
-    e.add_field(name="🦸 Les persos", value=(
-        f"{HERO_TEXT}\n"
-        "L'option `perso:` dit **qui combat** : le bot le place tout seul dans l'équipe, "
-        "en faisant défiler la liste s'il le faut. Sans rien choisir, il garde celui de l'assistant."), inline=False)
-    e.add_field(name="📦 Les modes Supply", value="\n".join(
-        f"**{SUPPLY_NAMES[k]}** — {SUPPLY_WHAT[k]} *(niveaux 1-{ec.MAX_LEVEL[k]})*" for k in SUPPLY_NAMES), inline=False)
-    e.add_field(name="🎛️ Les deux options", value=(
-        "🔋 **Recharge de stamina** — plus de stamina ? Le bot entre le code cadeau 15 fois et repart.\n"
-        "🛡️ **Chien de garde** — maintenance du serveur ou jeu bloqué 5 min ? Il relance le jeu tout seul.\n"
-        "Change-les d'un clic avec **/reglages**, ou juste pour un lancement avec `stamina:` et `gardien:`."), inline=False)
-    e.add_field(name="👀 Pendant que ça tourne", value=(
-        "**/statut** — où ça en est, avec la barre de progression\n"
-        "**/capture** — l'écran de l'émulateur en photo\n"
-        "**/stop** — tout arrêter\n"
-        "**/stats** — tes statistiques (runs, temps, dernières sessions)\n"
-        "**/planifier** · **/planning** — programmer un farm à heure fixe\n"
-        "À la fin, je t'écris en privé avec le résumé."), inline=False)
-    await interaction.response.send_message(embed=e, ephemeral=EPH)
+    await discord_ui.open_help(interaction)              # aide en pages (◀ ▶)
 
+
+discord_ui.setup(sys.modules[__name__])                # l'interface recoit CE module (pas une 2e copie)
 
 import maj_cmd
 maj_cmd.setup(cmd, embed, runner, BASE, EPH, COLORS, NO_WINDOW, ENV, discord, app_commands)

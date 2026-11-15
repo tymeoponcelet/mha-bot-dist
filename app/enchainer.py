@@ -49,7 +49,9 @@ def parse_token(tok):
             return dict(mode="hero", chars=p[1], hero=p[2] if len(p) > 2 else None)
         if kind in ("aa", "agency"):
             return dict(mode="aa", runs=int(p[1]) if len(p) > 1 else 10, bots=p[2] if len(p) > 2 else None,
-                        reset=int(p[3]) if len(p) > 3 else None)
+                        reset=int(p[3]) if len(p) > 3 and p[3] else None,
+                        reserve=p[4].lower() if len(p) > 4 and p[4] else None,
+                        resfloor=int(p[5]) if len(p) > 5 and p[5] else None)
         if kind in ("whm", "event", "evenement", "entrance", "hallway", "library"):
             return dict(mode="whm", event=kind if kind in ("hallway", "library") else "entrance", level=int(p[1]),
                         runs=int(p[2]) if len(p) > 2 else 1, hero=p[3] if len(p) > 3 else None)
@@ -77,6 +79,14 @@ def validate(st):
         st["event"] = st.get("event") if st.get("event") in ("entrance", "hallway", "library") else "entrance"
     elif m == "aa":
         st["runs"] = max(1, int(st.get("runs", 10)))
+        if st.get("reserve"):                     # persos reserves pour les hauts floors ("aucun" = personne)
+            names = [n.strip().lower() for n in str(st["reserve"]).split(",") if n.strip() and n.strip().lower() != "aucun"]
+            absent = [n for n in names if not (BASE / "templates_aa" / "chars" / f"{n}.png").exists()]
+            if absent:
+                raise SystemExit("Agency : perso reserve inconnu (pas d'icone templates_aa/chars/) : " + ", ".join(absent))
+            st["reserve"] = ",".join(names) or "aucun"
+        if st.get("resfloor") is not None:
+            st["resfloor"] = max(1, int(st["resfloor"]))
     elif m == "hero":
         if not st.get("chars"):
             raise SystemExit("Hero Trial : indique les persos a farmer (ex. hero:deku,denki).")
@@ -103,6 +113,17 @@ SUPPLY_NAMES = {"food": "Cafeteria (nourriture)", "money": "Bounty (argent)", "g
                 "card": "Reinforcement (cartes)", "crystals": "Recovery (cristaux)"}
 AA_BOTS = {"deku": "Deku", "bakugo": "Bakugo", "shoto": "Shoto", "momo": "Momo", "ochaco": "Ochaco",
            "eijiro": "Eijiro", "fumikage": "Fumikage", "denki": "Denki"}
+AA_CHAR_NAMES = {"am": "All Might", "endy": "Endeavor", "wheku": "WHM Deku", "whoto": "WHM Shoto"}
+
+
+def aa_chars():
+    """Persos possibles pour la reserve Agency = icones de templates_aa/chars/."""
+    d = BASE / "templates_aa" / "chars"
+    return sorted(f.stem.lower() for f in d.glob("*.png")) if d.is_dir() else []
+
+
+def aa_name(n):
+    return AA_CHAR_NAMES.get(n, n.capitalize())
 # choix "mode" proposes partout : cle -> (nom affiche, etape de depart)
 MODES_UI = {
     "supply":   ("📦 Supply", dict(mode="supply", supply="money", level=4, runs=10)),
@@ -131,12 +152,11 @@ def token(st):
     if m == "whm":
         return f"{st.get('event', 'entrance')}:{st['level']}:{st['runs']}{h}"
     if m == "aa":
-        t = f"aa:{st['runs']}"
-        if st.get("bots") or st.get("reset") is not None:
-            t += f":{st.get('bots') or ''}"
-        if st.get("reset") is not None:
-            t += f":{st['reset']}"
-        return t
+        f = [str(st["runs"]), st.get("bots") or "", "" if st.get("reset") is None else str(st["reset"]),
+             st.get("reserve") or "", str(st["resfloor"]) if st.get("resfloor") else ""]
+        while len(f) > 1 and f[-1] == "":              # champs facultatifs vides en fin : on les retire
+            f.pop()
+        return "aa:" + ":".join(f)
     return f"hero:{st['chars']}{h}"
 
 
@@ -153,7 +173,11 @@ def describe(st):
     if m == "aa":
         bots = ", ".join(AA_BOTS.get(b, b) for b in str(st.get("bots") or "").split(",") if b)
         reset = f" · reset du permit au floor {st['reset']}" if st.get("reset") else ""
-        return f"Agency Assessment · {st['runs']} combat(s)" + (f" · bots {bots}" if bots else "") + reset
+        res = ""
+        if st.get("reserve"):
+            who = ", ".join(aa_name(c) for c in st["reserve"].split(",") if c and c != "aucun")
+            res = f" · réservés floors {st.get('resfloor') or 10}+ : {who}" if who else " · aucun perso réservé"
+        return f"Agency Assessment · {st['runs']} combat(s)" + (f" · bots {bots}" if bots else "") + reset + res
     chars = ", ".join(c.capitalize() for c in str(st.get("chars", "")).split(",") if c)
     return f"Hero Trial · {chars}{h}"
 
@@ -181,6 +205,10 @@ def command(st):
             c += ["--bots", str(st["bots"])]
         if st.get("reset") is not None:
             c += ["--reset-floor", str(st["reset"])]
+        if st.get("reserve"):
+            c += ["--reserve", str(st["reserve"])]
+        if st.get("resfloor"):
+            c += ["--reserve-floor", str(st["resfloor"])]
         if WATCHDOG is not None:
             c.append("--watchdog" if WATCHDOG else "--no-watchdog")
         return c                                   # pas de --hero ni de recharge de stamina dans ce mode
