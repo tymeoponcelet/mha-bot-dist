@@ -1,6 +1,6 @@
 {
- "version": "2026.11.15-163549",
- "message": "Première version (lanceur + /maj)",
+ "version": "2026.11.15-163807",
+ "message": "Correctif lanceur",
  "files": {
   "GUIDE_AMI.txt": {
    "sha256": "263776b406438b0552f00c1214756ab1873b253a6aa6ceff18ab9c333baaaab1",
@@ -819,8 +819,8 @@
    "size": 214326
   },
   "updater.py": {
-   "sha256": "47a06d4724a170f2a2a81d9d54102df7568bad022ac3361330f3e1f54345b707",
-   "size": 13419
+   "sha256": "d53b82df1aadc7eac5848100f650f1f82ea3a51c0b711dffa380eef794ee9f03",
+   "size": 13856
   },
   "watchdog.py": {
    "sha256": "edba49b498384fda6e6a7785894eaee732ebd245a81bff3f13c60480ecabeae5",

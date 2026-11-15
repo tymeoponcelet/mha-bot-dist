@@ -280,6 +280,11 @@ def cmd_launch(root, settings):
 
 def cmd_frozen(root, settings):
     """Le .exe : il ne sait faire que le strict minimum, puis laisse app/updater.py faire le reste."""
+    # app/updater.py (publie) ne connait pas le depot : seul le .exe l'a en dur. On le note dans launcher.json,
+    # sinon /maj, le bouton "Mettre a jour" et les lancements suivants echoueraient ("Lanceur non configure").
+    lj = root / "launcher.json"
+    if not lj.exists() and not settings["repo"].startswith("REMPLACE"):
+        lj.write_text(json.dumps({"repo": settings["repo"], "branch": settings["branch"]}), encoding="utf-8")
     py = ensure_python(root)
     app_updater = root / "app" / "updater.py"
     if not app_updater.exists():
