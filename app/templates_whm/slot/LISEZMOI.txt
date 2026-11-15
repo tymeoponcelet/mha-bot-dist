@@ -1,0 +1,11 @@
+Images de l'EMPLACEMENT DU PERSO pour l'evenement WHM (facultatif).
+
+Le bot a besoin de savoir QUEL perso est deja place avant de lancer. Par defaut il utilise les images du Supply
+(templates_slot/<perso>.png). Si le panneau de l'evenement n'a pas la meme tete et que la lecture echoue
+("perso place non reconnu" dans le journal, ou "illisible" dans `python auto_whm.py --test`), mets ICI une capture
+de l'emplacement tel qu'il apparait DANS L'EVENEMENT :
+
+    templates_whm/slot/ende.png, deku.png, allmight.png...   (memes noms que templates_chars/)
+
+Cadre comme dans templates_slot/ : l'emplacement seul, avec le perso dedans. Des qu'il y a au moins un .png ici,
+le bot utilise CE dossier au lieu de templates_slot/.

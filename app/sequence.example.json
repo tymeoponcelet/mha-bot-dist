@@ -1,0 +1,5 @@
+[
+  {"mode": "supply", "supply": "money", "level": 4, "runs": 10},
+  {"mode": "supply", "supply": "gear", "level": 2, "runs": 3, "hero": "deku"},
+  {"mode": "nightops", "runs": 5, "hero": "denki"}
+]

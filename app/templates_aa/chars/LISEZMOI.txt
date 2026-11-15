@@ -1,0 +1,4 @@
+Icones des persos de l'Agency Assessment (menu des persos du lobby) : une image par perso, <nom>.png.
+Elles servent a trouver ton perso dans le lobby et a reconnaitre les persos RESERVES pour les hauts floors.
+am = All Might, endy = Endeavor, wheku = WHM Deku, whoto = WHM Shoto.
+Pour ajouter un perso : decoupe son icone (carre complet, avec le cadre) et enregistre-la ici sous <nom>.png.

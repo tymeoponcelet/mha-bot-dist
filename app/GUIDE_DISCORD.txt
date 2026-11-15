@@ -1,0 +1,100 @@
+BOT DISCORD - controler les bots MHA depuis ton telephone
+=========================================================
+Le bot tourne sur ton PC (a cote de l'emulateur). Aucun port a ouvrir : le PC se connecte a Discord, et toi tu ecris depuis
+l'appli Discord de ton telephone.
+
+A FAIRE UNE SEULE FOIS (~15 minutes)
+1. Installer la bibliotheque :   pip install discord.py
+2. Creer un serveur Discord prive (bouton "+" a gauche > "Creer le mien" > "Pour moi et mes amis"). Toi seul dedans.
+3. Creer le bot sur https://discord.com/developers/applications
+   - "New Application", donne un nom.
+   - Onglet "Bot" : "Reset Token", puis copie le token (il ne s'affiche qu'une fois ; ne le partage JAMAIS).
+     Rien a cocher dans "Privileged Gateway Intents".
+   - Onglet "OAuth2" > "URL Generator" : coche les scopes "bot" ET "applications.commands", AUCUNE permission.
+     Ouvre l'URL generee en bas et choisis ton serveur.
+4. Recuperer tes identifiants : Discord > Parametres > Avance > active le "Mode developpeur".
+   Clic droit sur ton pseudo > "Copier l'identifiant de l'utilisateur". Clic droit sur le nom du serveur > "Copier l'identifiant du serveur".
+5. Cree discord_config.json : le plus simple est de lancer lancer_discord.bat, il te pose 3 questions (token, ton identifiant,
+   identifiant du serveur) et l'ecrit pour toi. Ou copie discord_config.example.json en discord_config.json et remplis-le :
+       { "token": "TON_TOKEN", "allowed_user_ids": [TON_ID], "guild_id": ID_DU_SERVEUR, "sync_commands": true }
+   (pas de guillemets autour des identifiants chiffres)
+6. Pour recevoir les messages prives du bot : sur ton serveur, clic droit sur son nom > "Parametres de confidentialite" >
+   autorise les messages prives des membres du serveur.
+7. Lance lancer_discord.bat (double-clic). Tu dois voir "Connecte". Laisse la fenetre ouverte : elle relance le bot s'il plante.
+8. Sur ton telephone, ouvre ton serveur et tape "/" : les commandes apparaissent (attends 1 a 2 minutes la premiere fois).
+9. (facultatif) Demarrage automatique : Windows+R > shell:startup > mets-y un raccourci vers lancer_discord.bat.
+
+LES COMMANDES  (tape "/" sur Discord : elles s'affichent avec leur explication)
+Une commande PAR MODE : tu ne vois que les options qui servent a ce mode-la.
+
+/supply      Farm Supply. Options : farmer (Cafeteria = nourriture, Bounty = argent, Data Collection = materiel,
+             Reinforcement = cartes, Recovery = cristaux ; la liste indique les niveaux possibles), niveau (1-4,
+             Data Collection 1-2), multiruns, perso (menu deroulant des 10 persos), stamina, gardien, remplacer.
+/nightops    Farm Night Ops. Options : multiruns, perso, stamina, gardien, remplacer (aucune option Supply).
+/whm         Evenements WHM. Options : evenement (Entrance, Hallway ou Library), entree (niveau 1, 2 ou 3), multiruns, perso,
+             stamina, gardien, remplacer. Le bot coche "Consecutive Challenges" (le maximum de runs) et enchaine.
+/aa          Agency Assessment. Options : combats, bot1, bot2 (menu des 8 bots), reset_floor (remise du permit au floor 1
+             des qu'il atteint ce floor, 0 = jamais), floor_actuel (si le bot ne le lit pas), gardien, remplacer.
+/herotrial   Farm Hero Trial. Options : persos (ceux a FARMER, ex. deku,denki - commence a taper, le bot propose la suite),
+             perso (celui qui COMBAT), stamina, gardien, remplacer.
+/enchainer   Plusieurs modes a la suite. Ex. : supply:money:4:10 supply:gear:2:3 nightops:5
+             (supply:mode:niveau:multiruns[:perso]   nightops:multiruns[:perso]   whm:entree:multiruns[:perso]
+              hero:perso1,perso2[:perso])
+             Le bot propose les etapes au fur et a mesure que tu tapes.
+/reglages    Recharge de stamina et chien de garde : leur etat, avec DEUX BOUTONS pour les activer / desactiver d'un clic.
+             (Ces reglages valent pour tous les lancements ; les options "stamina" et "gardien" d'une commande ne valent
+             que pour CE lancement.)
+/statut      Ce qui tourne, depuis quand, barre de progression des multi-runs, ce que le bot fait en ce moment,
+             dernieres lignes du journal et etat de l'emulateur.
+/capture     T'envoie une capture de l'ecran de l'emulateur.
+/stop        Arrete le script en cours (et les bots lances par l'enchainement).
+/aide        Explique tout : les commandes, les persos utilisables, les modes Supply, les deux options.
+
+PERSOS UTILISABLES (menu deroulant, pas besoin de les ecrire) :
+  All Might (par defaut), Endeavor, Deku, Denki, Stain, Tsuyu, Ochaco, Iida, Nejire, Mirio.
+  "perso" = celui qui COMBAT : le bot le place tout seul dans l'equipe, en faisant defiler la liste s'il le faut.
+  Sans choix, il garde celui de l'assistant (config.json).
+
+Si l'emulateur est eteint, le bot te le dit au lieu de lancer. Un seul script tourne a la fois.
+Quand un script se termine ou s'arrete sur une erreur, tu recois un message prive avec le resume et les dernieres lignes.
+
+A SAVOIR
+- Seuls les identifiants de "allowed_user_ids" peuvent utiliser les commandes (le bot ignore les autres en silence).
+- Les reponses du bot sont privees : toi seul les vois (utile quand des amis sont sur le meme serveur).
+- Ne mets jamais discord_config.json dans un zip ou un message : il contient ton token. (Token fuite : "Reset Token" sur le portail.)
+- Le PC doit rester allume, ne pas se mettre en veille, avec l'emulateur et le jeu ouverts. Le bot ne peut pas les demarrer.
+- Si une etape bloque, envoie le message affiche dans la fenetre du bot.
+
+REPONSES PRIVEES OU PUBLIQUES
+-----------------------------
+Par defaut, seul celui qui tape la commande voit la reponse (pratique quand plusieurs personnes partagent le serveur).
+Pour que TOUT LE SERVEUR voie les reponses : "public_replies": true dans discord_config.json (ou reponds "o" a la question
+de configurer_discord.bat). En public, le bot ajoute le nom du PC en bas de chaque reponse, pour savoir qui fait quoi.
+Pour que la FIN d'un script soit annoncee dans un salon au lieu d'un message prive : "result_channel_id": <id du salon>
+(clic droit sur le salon > Copier l'identifiant). Sans ca, tu recois un message prive comme avant.
+Meme avec les reponses publiques, les BOUTONS de /reglages ne repondent qu'a leur proprietaire : si quelqu'un d'autre
+clique, il recoit juste un refus, et tes reglages ne bougent pas.
+
+UN SEUL BOT POUR PLUSIEURS PERSONNES (toi + tes amis)
+-----------------------------------------------------
+UN SEUL bot Discord, UN SEUL serveur, UN SEUL token, que tu donnes a tes amis. Chacun lance le bot sur SON PC avec SON
+emulateur. Toutes les instances recoivent toutes les commandes, mais chacune ne repond qu'a son proprietaire
+(allowed_user_ids) : quand ton ami tape /supply, c'est SON PC qui travaille, quand tu le fais, c'est le tien.
+Personne ne peut piloter le PC d'un autre.
+
+Ce que TU fais (une fois par ami) :
+1. Invite l'ami sur ton serveur Discord (clic droit sur le nom du serveur > "Inviter des gens").
+2. Lance creer_pack_ami.bat : il cree "mha script.zip" (sans ton token ni ton config.json) et verifie qu'aucun secret n'y est.
+3. Envoie-lui ce zip, et le TOKEN en message prive (jamais dans un salon). Il suit GUIDE_AMI.txt (dans le zip).
+4. Garde "sync_commands": true chez toi, et false chez les amis : seul ton PC enregistre les commandes.
+   Quand tu modifies les scripts, redonne le meme zip a tout le monde (tous doivent avoir la meme version).
+
+A propos du token : il donne le controle du BOT (jamais de ton PC). Qui l'a peut parler a sa place, le faire quitter le
+serveur ou l'utiliser ailleurs : ne le donne qu'a des gens de confiance. S'il fuite ou si un ami part, va sur le portail
+developpeur > Bot > "Reset Token", puis redonne le nouveau token a tout le monde (chacun relance configurer_discord.bat).
+
+Bon a savoir :
+- "L'application ne repond plus" sur Discord = le PC de cette personne est eteint, ou son lancer_discord.bat n'est pas ouvert.
+- Un ami = son propre compte de jeu, son propre emulateur, et la meme resolution que celle des images de boutons.
+- Discord limite les connexions du bot a 1000 par jour : n'ouvre pas dix fenetres en boucle, un seul lancer_discord.bat par PC.
+

@@ -1,0 +1,264 @@
+MHA BOT - PEACEKEEPING + HERO TRIAL + NIGHT OPS + SUPPLY AUTOMATIQUES
+==============================================================================
+
+QUATRE MODES (choisis-les dans l'assistant, carte "Mode")
+
+1) HISTOIRE / PEACEKEEPING
+Il enchaîne tout seul : quête -> Deploy -> Pathfinding -> 4 combats
+(Tap to continue) -> fermeture de la page de récompenses -> recommence.
+
+2) HERO TRIAL
+Menu principal -> UA -> Solo -> Hero Trial -> carte du perso -> Challenge (AUTO activé) -> Challenge Again
+tant qu'il reste des essais (2 par perso) -> Exit Stage -> perso suivant.
+Tu COCHES dans l'assistant les persos à farmer (miniatures cliquables) : Ochaco, Iida, Tsuyu, Deku, Denki,
+Eijiro, Mineta. Ils sont traités dans l'ordre d'affichage. Lance depuis le menu principal du jeu.
+
+3) NIGHT OPS (Multi-run)
+Menu principal -> UA -> Solo -> Night Ops -> Challenge -> + -> choix du perso (bouton Deploy de la ligne du perso choisi)
+-> Multi-run -> Max -> Start. Pendant le combat il appuie sur "Controlled Battle" si la fenêtre apparaît et
+active le mode AUTO s'il est désactivé, tape sur "Challenge Again" entre chaque combat du Multi-run (le compte à rebours est ignoré), tape sur "Tap to continue" après le combat, et clique en rafale sur le viseur
+(comme le mode Histoire) tant qu'aucun bouton n'est reconnu en combat. Tu choisis le nombre de lancements (Start) ; le bot s'arrête à la fin
+du dernier combat. Lance depuis le menu principal du jeu.
+
+AVANT DE COMMENCER
+1. Installe Python : https://www.python.org/downloads/
+   IMPORTANT : coche "Add python.exe to PATH" dans l'installateur.
+2. Utilise un émulateur PC (MuMu Player, BlueStacks, LDPlayer...) avec le jeu installé.
+
+CONTENU DU DOSSIER (ne déplace rien)
+  mha-bot/
+    lancer_assistant.bat   <- double-clique ici pour démarrer
+    setup_assistant.py     <- l'assistant d'installation
+    auto_story_mha.py      <- le bot Histoire
+    auto_hero_trial.py     <- le bot Hero Trial
+    templates/             <- les 5 images de boutons du mode Histoire
+        main.png  deploy.png  pathfinding.png  continue.png  close.png
+    auto_nightops.py       <- le bot Night Ops
+    heroes.py              <- choix du perso + défilement de la liste (utilisé par Night Ops, Supply et Hero Trial)
+    templates_chars/       <- UNE image par perso = sa ligne dans la liste de choix : allmight ende deku denki stain
+                              tsuyu ochaco iida nejire mirio (.png)
+    templates_nightops/    <- images du Night Ops : ua solo nightops challenge plus multirun max start
+                              controlbattle continue challagain auto  (auto.png = bouton AUTO quand il est DÉSACTIVÉ)
+    auto_supply.py         <- le bot Supply (utilise le moteur de auto_nightops.py : garde les deux fichiers ensemble)
+    auto_whm.py            <- mode EVENEMENT "Assault on Humarise Branch!"
+    templates_whm/         <- images de l'evenement : whmevent entrance whmlvl1 whmlvl2 whmlvl3 plusieursfois
+    fastmatch.py           <- reconnaissance d'images rapide (partagee par tous les scripts)
+    refill.py              <- recharge de stamina par code (utilise par les 4 modes)
+    watchdog.py            <- chien de garde : maintenance / jeu bloque -> relance le jeu
+    templates_watchdog/    <- images du chien de garde : iconverte croixpub iconeacc understood (+ tapcontinue facultative)
+    templates_stamina/     <- images de la recharge : insustam insustam2 morestam closestam cadeau code codearea take
+    templates_supply/      <- images du Supply : supply, food, money, gear, card, crystals, lvlfood, lvlmoney,
+                              lvlgear, lvlcard, lvlcrystals, confirm, continuechall
+    templates_slot/        <- portrait de chaque perso dans l'emplacement du panneau (Hero Trial : détecte le perso déjà placé)
+    templates_hero/        <- images du Hero Trial : boutons + une carte PNG par perso
+        ochaco.png iida.png tsuyu.png deku.png denki.png eijiro.png mineta.png ...
+    (platform-tools/ et config.json sont créés par l'assistant)
+
+UTILISATION
+1. Dézippe tout le dossier où tu veux (par exemple sur le bureau).
+2. Double-clique sur lancer_assistant.bat.
+3. Clique sur "Tout configurer automatiquement" : l'assistant installe les modules, télécharge ADB
+   et détecte l'émulateur. Les 4 cartes passent au vert quand tout est bon.
+4. Lance l'émulateur avec le jeu sur l'écran principal AVANT de cliquer (l'émulateur doit être détecté).
+5. Choisis le mode. Histoire : nombre de runs (commence par 1). Hero Trial : coche les persos à farmer.
+   Puis clique sur LANCER. Un bouton Stop arrête le bot.
+
+4) SUPPLY (Cafeteria / Bounty / Data Collection / Reinforcement / Recovery)
+Menu principal -> UA -> Solo -> Supply -> défilement de la liste pour trouver la carte du mode -> clic sur le niveau
+choisi (carte lvl*.png) -> Confirm -> + -> choix du perso (Deploy) -> Multi-run -> Max -> Start. Pendant le Multi-run : "Continue Challenge"
+à la fin de chaque run, "Tap to continue" après chaque combat, AUTO, clic en rafale sur le viseur. À la fin d'un Multi-run, "Challenge Again (50 times)" RELANCE
+un Multi-run (compte comme un lancement) ; quand le nombre de lancements voulu est atteint, le bot s'arrête.
+Dans l'assistant tu choisis : le mode (food, money, gear, card, crystals), le niveau (I à IV ; Data Collection = I et II)
+et le nombre de lancements (1 lancement = 1 Multi-run = 50 combats). Lance depuis le menu principal du jeu.
+Les images communes (ua, solo, plus, multirun, max, start, continue, challagain, controlbattle, auto) sont reprises
+de templates_nightops/ ; templates_supply/ contient supply, les 5 cartes de mode et les 5 cartes de niveaux.
+
+MODE ÉVÉNEMENT « Assault on Humarise Branch! » (auto_whm.py)
+TROIS ÉVÉNEMENTS, même fonctionnement : « Entrance » (entrance.png, cartes whmlvl1/2/3.png), « Hallway » (hallway.png, cartes
+hallwaylvl1/2/3.png) et « Library » (library.png, cartes librarylvl1/2/3.png, vignette library2.png). L'événement NON sélectionné s'affiche en vignette (entrance2.png / hallway2.png) : le bot clique
+d'abord dessus pour le sélectionner, puis sur sa bannière pour entrer. Ils sont au même endroit ; on choisit lequel dans l'assistant (boutons Entrance / Hallway / Library), sur Discord
+(/whm evenement:...), en ligne de commande (--event hallway ou --event library) ou dans un enchaînement (hallway:<niveau>:<multi-runs>[:perso]).
+Dans l'assistant : bouton « 🏛️ Événement », choisis l'entrée (Entrance 1, 2 ou 3) et le nombre de multi-runs.
+Sur Discord : /whm entree:... multiruns:... perso:... — dans un enchaînement : whm:<entrée 1-3>:<multi-runs>[:perso]
+Ce que fait le bot : menu principal -> icône de l'événement (whmevent.png) -> bannière (entrance.png) -> la carte de
+l'entrée choisie (whmlvl1/2/3.png) -> il place le perso choisi -> il COCHE « Consecutive Challenges » (plusieursfois.png,
+= le maximum de runs d'un coup) -> « Challenge » (whmchallenge.png) -> pendant les combats il active AUTO, puis à la fin de
+CHAQUE combat il tape vite « Challenge Again (3s) » (whmchallengeagain.png) pour relancer le suivant. Il ne quitte par
+« Exit Stage » que quand le nombre de multi-runs demandé est atteint ET que le jeu ne propose plus de relance.
+Un multi-run = un lancement depuis le panneau + toutes ses relances : avec multi-runs = 1, le bot enchaîne donc les combats
+jusqu'à ce que le jeu n'en propose plus (plus de stamina ou de tickets).
+Les cartes Entrance 1/2/3 sont reconnues par leur ILLUSTRATION (le texte « Entrance N » se ressemble trop : la carte 3
+était reconnue à 0,96 sur la carte 2). Le nombre de runs affiché (« Challenge 944 time(s) ») n'est jamais comparé, et le
+bot regarde si la case est déjà cochée avant d'y toucher (il ne la décoche jamais).
+Images à mettre dans templates_whm/ : whmevent.png, entrance.png, whmlvl1.png, whmlvl2.png, whmlvl3.png, plusieursfois.png,
+whmchallenge.png (le bouton de lancement) et whmchallengeagain.png (la relance de fin de combat). Attention, ces trois
+boutons jaunes ne se ressemblent PAS : « Challenge » ne marque que 0,40 sur « Challenge Again », et le « Start » des autres
+modes 0,67 sur « Challenge » — d'où une image par bouton.
+Le reste (start, plus, auto, continue, continuechall, exit, ua) est repris des autres modes : rien à recadrer.
+Test : python auto_whm.py --test (scores de chaque image sur l'écran actuel).
+
+VITESSE (fastmatch.py)
+Chercher une image en couleur sur toute la capture coûtait ~250 ms : avec 13 images, un tour de boucle prenait ~3 s, d'où
+les réactions lentes. Maintenant, en 3 temps : une image déjà vue est cherchée autour de son dernier emplacement (quasi
+gratuit) ; sinon repérage en noir et blanc à demi-échelle (~15 ms) ; puis vérification en couleur dans une petite fenêtre,
+qui donne exactement le score d'avant. Mesuré : ~13x plus vite, 0 différence de résultat sur 19 images x 8 écrans.
+La capture d'écran brute (sans compression PNG) est maintenant utilisée par TOUS les modes, et les pauses ont été réduites
+(0,22 s entre deux captures au lieu de 0,4). Si jamais tu soupçonnes la reconnaissance : relance avec --slow-match
+(ancienne méthode, lente) et compare. Les scores de --test sont toujours calculés à l'ancienne, donc exacts.
+
+MODE AGENCY ASSESSMENT (auto_aa.py, images dans templates_aa/)
+Assistant : bouton « 🏢 Agency ». Discord : /aa. Enchaînement : aa:<combats>[:bot1,bot2[:floor du reset]].
+Chemin : Co-op -> Agency Assessment -> Join Team -> Create Team, puis dans le lobby : Insert Permit -> lecture du FLOOR ->
+(reset si le floor a atteint celui que tu as fixé : Recruit -> My Permit -> Reset to Floor 1 -> Confirm) -> Bots : ajout des 2
+bots choisis avec Add, fermeture par la croix -> Deploy -> AUTO -> Card Flip -> 3 cartes retournées -> Return -> on recommence.
+LE FLOOR est lu sur le permit (chiffre jaune). Le bot ne connaît au départ que le « 4 » de ta capture ; il APPREND les autres
+tout seul (après un reset il sait qu'il est au floor 1, puis +1 par combat gagné) et les range dans templates_aa/floors/.
+Au tout premier lancement sur un floor inconnu, donne-le dans « Floor actuel » (ou --floor N).
+PERSOS ET STAMINA (2/2 -> 1/2 -> 0/2) : pour que le bot change de perso tout seul, il doit savoir où cliquer sur TON perso
+dans le lobby : "aa_char_pos": [x, y] dans config.json (fractions de l'écran). Il ouvre alors le menu avant chaque combat,
+balaie la liste horizontale et prend le 1er perso qui a encore de la stamina ; il s'arrête quand plus aucun n'en a.
+Sans ce réglage il ne touche pas au perso, et s'arrête quand Deploy ne lance plus de combat.
+capture_ecran.bat : enregistre une capture plein écran dans debug/ (pratique pour me montrer un écran).
+
+RETOUR AU MENU PRINCIPAL (nav.py) - cas gérés en plus des popups habituels
+  - combat en cours : le bot appuie sur le bouton PAUSE (templates/pause.png, cherché seulement dans le coin haut-droit), puis
+    sur « Exit Stage » ; la touche Retour de l'émulateur ne sert plus qu'en dernier recours ;
+  - dialogue avec un personnage de la ville : bouton « Leave » (templates/leave.png) ;
+  - fenêtre « Daily Sign-in » : « Sign In » puis la croix rouge.
+Dans l'événement WHM, le bot ne tape plus jamais l'icône U.A. du menu principal : il attend l'icône de l'événement.
+
+CHIEN DE GARDE : MAINTENANCE / JEU BLOQUÉ (Hero Trial, Night Ops, Supply, Événement, Enchaîner) - OPTION, désactivée par défaut
+Active-la avec la case « 🛡️ Chien de garde » de l'assistant, avec /reglages sur Discord (bouton), ou avec --watchdog en ligne de commande
+(--no-watchdog la coupe). Le choix est mémorisé dans config.json ("watchdog"). Deux situations :
+  1. MAINTENANCE / retour à l'écran d'accueil. Sur la barre du serveur (« Server 1 OPEN BETA ») il y a une pastille à gauche :
+     ORANGE = serveur en maintenance, le bot attend (une capture toutes les 20 s, jusqu'à 8 h) ; VERTE = serveur rouvert,
+     le bot clique sur « Tap to continue », JUSTE SOUS la barre (jamais sur l'icône elle-même, qui ouvre le choix du
+     serveur), ferme les annonces et revient au menu principal. La couleur est lue directement sur
+     la pastille, donc UNE SEULE image (iconverte.png) suffit pour les deux états.
+  2. BLOQUÉ : aucun « Continue Challenge » ni « Challenge Again » depuis 5 min ("watchdog_stall").
+     EN PLEIN COMBAT, il attend 4 fois plus longtemps (20 min, "watchdog_stall_battle") : un combat d'événement peut
+     durer plus de 5 minutes, et relancer le jeu à ce moment-là ressemble à un crash. Les autres cas (maintenance,
+     écran d'accueil, jeu fermé) restent immédiats -> le bot FERME le jeu et refait toute la
+     séquence : pub de l'émulateur (croixpub.png) -> icône du jeu (iconeacc.png) -> bouton Understood (understood.png) ->
+     attente de la pastille verte -> « Tap to continue » -> annonces -> menu principal. Puis le script reprend où il en était
+     (le multi-run en cours est recompté comme à refaire).
+Quand la maintenance commence en pleine partie, le jeu affiche un bouton « Back to login » (maintenance.png) : le bot appuie
+dessus, puis sur « Restart » (restart.png) s'il apparaît sur l'écran d'accueil, attend la pastille verte, et tape AU MILIEU DE
+L'ÉCRAN pour entrer (jamais sur la barre du serveur ; si le milieu tombe sur la barre, il tape juste dessous).
+Le jeu fermé par erreur (plantage, retour au bureau de l'émulateur) déclenche la même séquence.
+Garde-fou : 3 récupérations en moins de 30 min sans aucun progrès entre deux -> le bot s'arrête, avec des captures dans debug/.
+Images (templates_watchdog/) : iconverte.png (la barre entière avec la pastille verte), croixpub.png, iconeacc.png,
+understood.png, et tapcontinue.png (facultative : sans elle le bot tape à "tap_continue" de config.json, par défaut [0.5, 0.8]).
+Réglages config.json : "watchdog_stall" (300 s), "maintenance_max_h" (8), "game_package" (détecté tout seul au 1er lancement),
+"tap_continue". Test : python watchdog.py --test (scores + couleur de la pastille) ; python watchdog.py --now (relance tout de suite).
+
+RECHARGE DE STAMINA (Hero Trial, Night Ops, Supply, Événement, Enchaîner) - OPTION, désactivée par défaut
+Active-la avec la case « 🔋 Recharger la stamina avec le code » de l'assistant, avec /reglages sur Discord (bouton), ou avec --refill en ligne
+de commande (--no-refill la coupe). Le choix est mémorisé dans config.json ("stamina_refill"). Quand la stamina manque, le bot
+utilise le code cadeau BETASTAMINA 15 fois (+1000 chacune, 15000 max), puis reprend là où il en était :
+  A. pendant un multi-run, le bouton jaune « Insufficient Stamina » (insustam.png) remplace « Continue Challenge » : le bot clique
+     sur le bouton Exit à droite, revient au menu principal, puis fait la recharge ;
+  B. tu lances sans stamina : le message « Insufficient stamina. » (insustam2.png) : il clique sur la croix rouge en haut à droite ;
+  C. la fenêtre « Stamina Supply » (morestam.png) : il clique sur sa croix rouge (closestam.png).
+Recharge : menu principal -> cadeau (cadeau.png) -> liste de gauche, il descend jusqu'à « Gift Pack Exchange » (code.png) ->
+fenêtre Hero Box (codearea.png) : clic sur « Please enter the pick-up code. », il tape le code, clique en dehors du champ puis sur
+Take (take.png), 15 fois. Si l'écran « plus de stamina » revient moins de 90 s après une recharge (code épuisé ?), il s'arrête.
+Sans l'option, rien ne change : le bot s'arrête comme avant. Réglages avancés (config.json) : "refill_code", "refill_count" (1-15).
+Test sur l'émulateur : python refill.py --test (scores des images) ; python refill.py --now (lance la recharge tout de suite).
+Après chaque Take, si un popup de récompense recouvre la fenêtre, le bot fait l'autoclick sur le viseur (comme en combat). Il est COUPÉ pendant la saisie du code (du clic sur le champ jusqu'à Take) pour ne pas annuler l'entrée.
+Après la fermeture (Exit / croix), le bot appuie sur home.png pour revenir au menu principal avant d'entrer le code.
+Fonctionne aussi dans Hero Trial (la croix est repérée par closestam.png, à plusieurs tailles, ou par sa couleur rouge : pas besoin de close.png).
+Avec UN seul multi-run : si le lancement échoue faute de stamina, il recharge puis le relance ; si le multi-run est fini, il recharge et termine.
+Pas géré : le mode Histoire.
+
+CHOISIR LE PERSO QUI COMBAT (Hero Trial, Night Ops, Supply)
+Dans l'assistant, une rangée de portraits "Personnage qui combat" apparaît dans ces trois modes : clique sur le perso voulu
+(il passe en vert avec un ✔, son nom s'affiche à côté du titre et il est mémorisé dans config.json). Au lancement, le bot
+tape sur le "+", puis cherche la ligne de ce perso dans la liste. S'il ne la voit pas à l'écran, il FAIT DÉFILER la liste vers
+le bas, puis vers le haut si besoin, jusqu'à la trouver, et appuie sur SON bouton Deploy. S'il ne la trouve nulle part après un
+aller-retour complet, il s'arrête avec un message (il ne touche jamais à Retour). Le mode Histoire n'a pas de choix (équipe automatique).
+PERSO DÉJÀ PLACÉ (Hero Trial, Night Ops, Supply)
+Un perso placé reste en place, donc le "+" n'apparaît plus. AVANT de lancer un combat (Challenge en Hero Trial, Multi-run en
+Night Ops / Supply), le bot regarde QUEL perso est placé : si c'est celui choisi dans l'assistant il le garde ; sinon il tape sur
+l'emplacement pour ouvrir la liste et le remplace (il confirme sur 2 captures avant de changer). Il le reconnaît grâce à
+templates_slot/<perso>.png (portrait du perso dans l'emplacement, un fichier par perso).
+- Si le bot ne peut pas vérifier ET ne sait pas où taper, il S'ARRÊTE avec un message (plutôt que de lancer avec un mauvais perso).
+- Si le clic sur l'emplacement n'ouvre pas la liste, il s'arrête aussi avec un message.
+- Pas d'image templates_slot/<ton perso>.png : il le signale et continue sans vérifier.
+- Option --no-verify : désactive cette vérification (ex. python auto_nightops.py --no-verify).
+- `python auto_hero_trial.py --test` affiche quel perso il voit dans l'emplacement.
+Attention : ce choix est SÉPARÉ des cartes du Hero Trial (templates_hero/deku.png, ochaco.png... = les persos à FARMER).
+Ici (templates_chars/) ce sont les lignes de ta liste de persos, dossier différent, noms identiques sans conflit.
+AJOUTER UN PERSO À CHOISIR : capture sa ligne dans la liste (portrait + BP + Deploy, même résolution que l'émulateur), recadre-la comme
+les autres et dépose-la dans templates_chars/ (ex. todoroki.png) : elle apparaît toute seule dans l'assistant.
+
+AJOUTER UN NOUVEAU PERSO AU HERO TRIAL
+Prends une capture de sa carte (même résolution que les autres, comme deku.png), recadre-la et dépose-la
+dans templates_hero/ avec un nom en minuscules (ex. todoroki.png). Elle apparaît toute seule dans l'assistant.
+
+LIGNE DE COMMANDE (optionnel)
+  python auto_hero_trial.py --list                  liste les persos disponibles
+  python auto_hero_trial.py --chars deku,denki      farm uniquement ces persos
+  python auto_hero_trial.py --test                  diagnostic : score de reconnaissance de chaque image
+  python auto_nightops.py --runs 3                  Night Ops : 3 lancements de Start
+  python auto_nightops.py --test                    diagnostic Night Ops (score de chaque image)
+  python auto_supply.py --mode food --level 4 --runs 2   Supply : mode food, niveau IV, 2 lancements
+  python auto_supply.py --test                      diagnostic Supply (score de chaque image sur l'écran actuel)
+  python auto_nightops.py --hero mirio              choisit le perso en ligne de commande (aussi pour auto_supply.py / auto_hero_trial.py)
+
+SI LE BOT NE RECONNAÎT RIEN
+Les images de templates/ doivent avoir été prises à la même résolution que ton émulateur.
+Si ta résolution est différente, refais les captures : bouton "Capturer l'écran"
+de l'assistant -> capture.png, puis recadre chaque bouton et enregistre-le dans
+templates/ avec les mêmes noms.
+
+ATTENTION
+Le jeu est en ligne : les outils d'automatisation sont généralement contraires aux
+conditions d'utilisation et peuvent entraîner une sanction sur ton compte.
+Tu l'utilises à tes risques.
+
+FENETRE DE L'ASSISTANT
+Le bouton LANCER / Stop et la barre de progression sont FIXES en bas de la fenêtre : ils restent visibles quel que soit le mode
+et la hauteur de ta fenêtre. Le reste (étapes, options du mode, choix du perso, journal) défile à la molette ou avec la barre de droite.
+
+--- RETOUR AU MENU PRINCIPAL (nav.py) ---
+Avant de lancer un mode, les bots (Hero Trial, Night Ops, Supply) reviennent d'eux-memes au menu principal : ils tapent le
+bouton HOME (templates/home.png), ferment les popups (close / continue) et verifient que l'icone UA est visible.
+En combat (rien de reconnu), ils envoient la touche RETOUR de l'emulateur : menu "Exit Stage" (templates/exitstage.png) ; en Night Ops
+un 2e Retour ouvre "Abandonning Stage" (templates/abandonno.png). La touche Retour n'est jamais envoyee sur le menu principal.
+Si ce n'est pas possible (popup inconnu...), ils le disent et continuent comme avant.
+  python nav.py            # retourne au menu principal
+  python nav.py --test     # une capture : score de ua / home / close / continue
+  --no-home                # desactive ce retour dans un bot
+
+
+5) ENCHAINER (plusieurs modes a la suite)
+Dans l'assistant, bouton "Enchaîner" : choisis un type d'étape (Supply / Night Ops / Hero Trial), règle-le (mode, niveau,
+lancements, perso), clique "Ajouter cette étape", et recommence. Le plan peut être réordonné (▲ ▼) ou modifié (✕).
+Exemple : Supply Bounty niv.4 x10, puis Supply Data Collection niv.2 x3, puis Night Ops x5.
+Le bot revient au menu principal entre deux étapes. Une étape en échec (plus de stamina...) est signalée puis on passe à la
+suivante, sauf si "S'arrêter à la 1re erreur" est coché. Stop arrête tout.
+En ligne de commande : python enchainer.py supply:money:4:10 supply:gear:2:3 nightops:5   (voir enchainer.py)
+    enchainer.py           <- l'enchaineur (utilise les autres bots)
+    sequence.example.json  <- exemple de plan pour la ligne de commande
+
+6) BOT DISCORD (controle a distance depuis le telephone)
+Voir GUIDE_DISCORD.txt. Fichiers : discord_bot.py, lancer_discord.bat, discord_config.example.json (a copier en discord_config.json).
+Commandes : /lancer  /enchainer  /stop  /statut  /capture
+
+BOT DISCORD (controle depuis le telephone, un seul bot pour toi + tes amis)
+  discord_bot.py  lancer_discord.bat  configurer_discord.py  GUIDE_DISCORD.txt  (lis ce guide)
+  creer_pack_ami.bat  -> cree "mha script.zip" a donner a un ami (sans ton token ni ton config.json)  |  GUIDE_AMI.txt = son mode d'emploi
+
+AGENCY ASSESSMENT : PERSOS RESERVES POUR LES HAUTS FLOORS
+---------------------------------------------------------
+Tu peux garder certains persos (et leur stamina) pour les floors 10+ :
+  - en dessous du floor choisi (10 par defaut), le bot ne joue JAMAIS un perso reserve ;
+  - a partir de ce floor, il joue les persos reserves en priorite, puis les autres s'ils n'ont plus de stamina ;
+  - s'il ne reste que des persos reserves sous ce floor, le bot s'arrete pour les garder.
+Reglage : assistant (mode AA) ou Discord (/aa reserves:nom1,nom2 floor_reserve:10) ou
+  python auto_aa.py --reserve nom1,nom2 --reserve-floor 10
+Les icones des persos sont dans templates_aa/chars/ (am = All Might, endy = Endeavor, wheku / whoto = versions WHM).
+Le bot clique sur ton perso (le modele 3D a gauche du lobby) pour ouvrir le menu, lit la stamina (2/2, 1/2, 0/2)
+au-dessus de chaque perso et choisit. Si "Insufficient stamina" s'affiche apres Deploy, il change de perso tout seul.
+Si le clic n'ouvre pas le menu : donne la position de ton perso dans config.json, "aa_char_pos": [x, y] (fractions 0-1).

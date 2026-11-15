@@ -1,0 +1,38 @@
+BOT MHA - GUIDE POUR UN AMI (controler ton PC depuis Discord sur ton telephone)
+================================================================================
+Tu utilises le MEME bot Discord que la personne qui t'a envoye ce zip, mais le bot tourne sur TON PC et ne pilote QUE
+ton emulateur. Personne d'autre ne peut controler ton PC, et toi tu ne peux pas controler le sien.
+
+CE QU'IL TE FAUT
+- Un PC Windows avec un emulateur (MuMu / BlueStacks / LDPlayer...) et le jeu installe, avec TON compte de jeu.
+- Python : https://www.python.org/downloads/  (coche "Add python.exe to PATH" dans l'installateur)
+- Etre membre du serveur Discord (lien d'invitation donne par ton ami) et avoir Discord sur ton telephone.
+- Le TOKEN du bot : ton ami te l'envoie en message prive. Ne le repartage a personne, ne le poste jamais dans un salon.
+
+INSTALLATION (une seule fois, ~15 minutes)
+1. Dezippe "mha script.zip" (par exemple sur le bureau).
+2. Double-clique sur lancer_assistant.bat > "Tout configurer automatiquement" (installe les modules, telecharge ADB, detecte l'emulateur).
+   Lance ton emulateur avec le jeu ouvert AVANT de cliquer.
+3. RESOLUTION : les images de boutons (templates...) ont ete prises a une resolution precise. Regle ton emulateur sur la MEME
+   resolution que ton ami (demande-lui laquelle ; il la voit avec le bouton "appareil photo" de l'assistant). Sinon, rien ne sera reconnu.
+   Teste d'abord un mode depuis l'assistant : si ca marche la, ca marchera depuis Discord.
+4. Recupere ton identifiant Discord : Discord > Parametres > Avance > active "Mode developpeur", puis clic droit sur TON pseudo
+   > "Copier l'identifiant de l'utilisateur". (Pour l'identifiant du serveur : clic droit sur son nom > "Copier l'identifiant du serveur".)
+5. Double-clique sur lancer_discord.bat. La premiere fois il installe discord.py puis te pose 3 questions :
+   token, ton identifiant, identifiant du serveur (souvent deja propose). Tu dois ensuite voir "Connecte".
+   Laisse la fenetre ouverte : elle relance le bot s'il plante.
+6. Sur ton telephone : ouvre le serveur et tape "/". Commence par /aide : il explique tout.
+   /supply /nightops /whm /herotrial pour lancer un farm (chaque commande n'affiche que SES options),
+   /enchainer pour plusieurs modes a la suite, /statut /capture /stop pour suivre, /reglages pour les deux options
+   (recharge de stamina par code cadeau, et chien de garde qui relance le jeu en cas de maintenance ou de blocage).
+   Les reponses sont privees (toi seul les vois). Tu recois aussi un message prive quand un script se termine.
+   Pour recevoir ces messages : clic droit sur le serveur > "Parametres de confidentialite" > autorise les messages prives.
+7. (facultatif) Demarrage automatique : Windows+R > shell:startup > mets-y un raccourci vers lancer_discord.bat.
+
+A SAVOIR
+- Le PC doit rester allume, sans veille, avec l'emulateur et le jeu ouverts. Le bot ne peut pas les demarrer a distance.
+- Un seul script a la fois sur ton emulateur (le bot refuse d'en lancer un second ; /stop pour arreter).
+- "L'application ne repond plus" sur Discord = ton lancer_discord.bat n'est pas ouvert (ou ton PC est eteint).
+- Les commandes que tu tapes dans le serveur sont recues par tous les bots, mais seul le tien repond : c'est normal.
+- Pas de config.json chez toi au depart : l'assistant le cree a l'etape 2 (chemin ADB + appareil). Ne copie pas celui de ton ami.
+- Si une etape bloque, envoie a ton ami le message affiche dans la fenetre du bot (sans le token !).

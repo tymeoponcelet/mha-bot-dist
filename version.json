@@ -1,0 +1,830 @@
+{
+ "version": "2026.11.15-163549",
+ "message": "Première version (lanceur + /maj)",
+ "files": {
+  "GUIDE_AMI.txt": {
+   "sha256": "263776b406438b0552f00c1214756ab1873b253a6aa6ceff18ab9c333baaaab1",
+   "size": 3505
+  },
+  "GUIDE_DISCORD.txt": {
+   "sha256": "492ceb1fb95aa16680028dc0788d16d48a1d9fb18ee463ca53bcc76501852618",
+   "size": 8172
+  },
+  "LISEZMOI.txt": {
+   "sha256": "6b73edf8d7689e7de4a98070d1a307c76006f9a4e15a78da8e1096a8b06fc4a5",
+   "size": 23940
+  },
+  "aa_digits.py": {
+   "sha256": "cdfb5539a9a56891e14ea7f9bb54c8f73089973634473aa353a06952a0290010",
+   "size": 4846
+  },
+  "auto_aa.py": {
+   "sha256": "4476ab905ec8e27a8c8d9f9a498016b8f343bcb0a22f39c653d4bc5e03c31f52",
+   "size": 42375
+  },
+  "auto_hero_trial.py": {
+   "sha256": "ae618e684a7d9652596032dbd6004ec10cd279de47978b39e76544a6e34c21df",
+   "size": 30654
+  },
+  "auto_nightops.py": {
+   "sha256": "84fb02e3d1cf01cbb1ee138b3c351b7f80b239d4875810deb5857b863845cfe8",
+   "size": 20115
+  },
+  "auto_story_mha.py": {
+   "sha256": "57765c7eb4ad98daab209943279f15f9aae7d0aa7d006706cc73541a8dd05ae5",
+   "size": 6901
+  },
+  "auto_supply.py": {
+   "sha256": "b7e70124dd7a0a8c0c7d40cb66534269f3cef56be578c2b10335f97fa92acdd5",
+   "size": 26046
+  },
+  "auto_whm.py": {
+   "sha256": "a025b0cbb2443fe5f8be02c1101e384c9a54a075b04a7b620c435c2b374f310f",
+   "size": 31989
+  },
+  "capture_ecran.bat": {
+   "sha256": "0dcb9c906b0b5c0d857616d93fc143eaebec8ee81ad8a30b0e2d6f5dce6db87c",
+   "size": 148
+  },
+  "configurer_discord.bat": {
+   "sha256": "ae7081c5cb4088416f30bc92fb0c8551ad4cc3ad1a859f3ba761aa9470ee78bb",
+   "size": 522
+  },
+  "configurer_discord.py": {
+   "sha256": "76eec2609f0dcffa610324ee69b3b57cc024834d4c167e5139b39c35b45a5c62",
+   "size": 3287
+  },
+  "creer_pack_ami.bat": {
+   "sha256": "52034d5246d4e41ec757d00ebb2f23c1d658b5892305162b223746ebf9073361",
+   "size": 109
+  },
+  "creer_pack_ami.py": {
+   "sha256": "86ea5b618644c66977818df34a2ff3e0df7eed6f5c3df9af45e30b5d9f6dd05a",
+   "size": 2219
+  },
+  "discord_bot.py": {
+   "sha256": "e77173ab0e83fb33c592761e6a3a740b7f3486c72ef0f65dcd281d65e436a4ef",
+   "size": 41299
+  },
+  "discord_config.example.json": {
+   "sha256": "53f945026eb4ae84eeb29e070857dc392ab67408a2316568e3518781938e6e89",
+   "size": 226
+  },
+  "enchainer.py": {
+   "sha256": "3eb22a041f369398f2932aec59b1dde05e4e8aab2a6b321f6249e62ada6100b6",
+   "size": 9203
+  },
+  "fastmatch.py": {
+   "sha256": "5fa0bf43e20e18d93f3696cf032995f99c4a425cea81d37e5f739f97f6659399",
+   "size": 4934
+  },
+  "heroes.py": {
+   "sha256": "e43482443aaeb2b3b0566546d1c8daaeaea091e60cf4f14b48e2e0d0f63d513e",
+   "size": 18595
+  },
+  "hub.py": {
+   "sha256": "c27a4c4f7e7295ce72543b7e4d7e3e20c6b6461314bc1af92ac5ebe77dbd2a1c",
+   "size": 10068
+  },
+  "lancer_assistant.bat": {
+   "sha256": "29a4bd19b4cd45453954cd7e8d164f4d3a76c8514b5b2452c1b62de5f0bc6a2b",
+   "size": 237
+  },
+  "lancer_discord.bat": {
+   "sha256": "31ad60106b85df7dcc724e1d606cd936cb0e87d33629844ba40cdfa749949b7c",
+   "size": 819
+  },
+  "lancer_enchainement.bat": {
+   "sha256": "42940c579490eff615db78097c81ede5d1b8ae5e7b385d2e8dba3ce0e25b5bdc",
+   "size": 175
+  },
+  "maj_cmd.py": {
+   "sha256": "c01de629bc0f87e9afd1f578998c6ffa08bac55cb0c48c0c760006fa86b63d87",
+   "size": 4842
+  },
+  "nav.py": {
+   "sha256": "4e864eee4cf124d9d88752aef62659e8850dffe8ddf96b5503173d966ce24fad",
+   "size": 13500
+  },
+  "refill.py": {
+   "sha256": "5071e9487043cbad04a7fb47c6b207e89cccd83cf73610f7d7b4bab0fe143b7f",
+   "size": 19276
+  },
+  "requirements.txt": {
+   "sha256": "c7af4b65cf9bdcc9f34344377b96fdad20647f10b0210413d299ef00f01337de",
+   "size": 31
+  },
+  "sequence.example.json": {
+   "sha256": "206733f3c2d88fd783ee58ed4682b07677865cbf22ed11e2ccb74df995f98478",
+   "size": 199
+  },
+  "setup_assistant.py": {
+   "sha256": "d41fbb53ddba1c9ae82a619cc32185c85726cb12701fc073b2416410ab697439",
+   "size": 74810
+  },
+  "templates/abandonno.png": {
+   "sha256": "bb04a1190655e5bf2992df0a2d7d8a0de672df7d11d205f26fd7a673bd550365",
+   "size": 40706
+  },
+  "templates/close.png": {
+   "sha256": "597e21ffce5660dd73584124f413189f60ed050496c090bb90be3ff6141faf62",
+   "size": 9910
+  },
+  "templates/continue.png": {
+   "sha256": "8e1b93ab66edbd2b4a6de4756dfbd32ec62958e17f81983ed2c7b6d0f58fef60",
+   "size": 5934
+  },
+  "templates/deploy.png": {
+   "sha256": "5cda553f2eebf09ca93e32a4f7ab8dc4ed2d69558f415c7d8fcb9e54965904c3",
+   "size": 24214
+  },
+  "templates/exitstage.png": {
+   "sha256": "bf75b8ed2a331ba473496b80929326ae21c9afc975de2ed74c5304714a86fdea",
+   "size": 24658
+  },
+  "templates/home.png": {
+   "sha256": "f34ac39e502bafd048537fe8ea4129344fb1714cccf523c68d11b9b88118fbd8",
+   "size": 8725
+  },
+  "templates/leave.png": {
+   "sha256": "9d26c459c445a736b176f43cbc16324e241bf0689eb0bb87a5591b396dc999b0",
+   "size": 6805
+  },
+  "templates/main.png": {
+   "sha256": "841762b5816eb549dbb1a4f788cba750ae85eba9c42dc75479f9d4f89a39e14b",
+   "size": 14945
+  },
+  "templates/pathfinding.png": {
+   "sha256": "9398f9a3009c31e669cd8f73b3675b3d2c6514ced469a802bec7867f1e133fde",
+   "size": 16448
+  },
+  "templates/pause.png": {
+   "sha256": "dfaa06c13487a24faf56b850085fceb915d9d022b8b18ff2defa274958520aa7",
+   "size": 1631
+  },
+  "templates/signin.png": {
+   "sha256": "f91555725c59be87736c0c4424aa5788f94e74ddc958a1460660a81dc3049ef4",
+   "size": 16513
+  },
+  "templates/xpopup.png": {
+   "sha256": "eed42c134eeb3df2dbd79b81cfa121687d16c4094bbe6a24ad107aecf733b607",
+   "size": 10094
+  },
+  "templates_aa/aa.png": {
+   "sha256": "23f4f3203792834cf1f54d9453cf46284fb97904b7a1d30cf4e16ca00fb0edd5",
+   "size": 106136
+  },
+  "templates_aa/add.png": {
+   "sha256": "518b14f1b1d8067fe94c886440a2a9dcba7124b7fab88232138512c268598062",
+   "size": 14609
+  },
+  "templates_aa/bakugo.png": {
+   "sha256": "02107c2b54d690297c589efe2d4e511bb7661e500cc2dd6f92ebaa63c32e20a9",
+   "size": 45299
+  },
+  "templates_aa/bots.png": {
+   "sha256": "752bc1d9a6e32dd843624014e0d587e1a95c498e62a2c209c3bfaf28d7d5985c",
+   "size": 11339
+  },
+  "templates_aa/botsgris.png": {
+   "sha256": "d83b715e1cdff5330c07b0945e8b64915fa8f15ef65a2a1fd3d1f297145f7ba9",
+   "size": 7957
+  },
+  "templates_aa/cardflip.png": {
+   "sha256": "3d4b561e801c55c6abdc996204a9ff5737d58f35225590eb334aa0d727f1c3e3",
+   "size": 28589
+  },
+  "templates_aa/cardflip2.png": {
+   "sha256": "87bc4522bd6a18c323f2074f03d3149f8637db459e0a8d022af1122323532f10",
+   "size": 423440
+  },
+  "templates_aa/chars/LISEZMOI.txt": {
+   "sha256": "7a17a473fb027dea1605b3da72ba3251853f5d6f55e734cfc785b7a0905c1d89",
+   "size": 390
+  },
+  "templates_aa/chars/aizawa.png": {
+   "sha256": "718178eee66f89460fad59b63c0cb4c93f720633a779c7d3dfe7f03129475025",
+   "size": 15217
+  },
+  "templates_aa/chars/am.png": {
+   "sha256": "687a8bbabdafc59fe116b92348f14f21693f48e05d038a42d5cc4b94a7c01184",
+   "size": 33457
+  },
+  "templates_aa/chars/bakugo.png": {
+   "sha256": "38988a22a7c1d8c2f9b74dc0036bd993c10f94ac0b9d8028d5f266a53da863cb",
+   "size": 32995
+  },
+  "templates_aa/chars/deku.png": {
+   "sha256": "a2dfe8ce68c62234af8dc2e54b71f40244f5122aeba996152cc8af7abe697e18",
+   "size": 33506
+  },
+  "templates_aa/chars/denki.png": {
+   "sha256": "b240a29ae122f4d0198c486c6fb114289b0f318ead910dd6f5017dcb7a7d2ba4",
+   "size": 37160
+  },
+  "templates_aa/chars/eijiro.png": {
+   "sha256": "8a979073ba7176da0c8534659a04da0439dcfb0c9f93355cce1af68073ac6459",
+   "size": 29556
+  },
+  "templates_aa/chars/endy.png": {
+   "sha256": "f4bf9f5d5ae0d71ad633fb5e590986e3556a772c4d396cbe6087672a048e1bb1",
+   "size": 35296
+  },
+  "templates_aa/chars/hawks.png": {
+   "sha256": "222794d7ba3a32928211086c435d064d2a7dd6cee2c3d151f2249a8478a3d82d",
+   "size": 13361
+  },
+  "templates_aa/chars/iida.png": {
+   "sha256": "c62c451a9683511c2f27a8ea284dba3e0214e0d136245cd0fe30f029ac90fc3f",
+   "size": 30136
+  },
+  "templates_aa/chars/mina.png": {
+   "sha256": "e817c802810b5bcd9eee87639143b1b5ede40ef3d5c47b0735f542dfe9b54736",
+   "size": 33053
+  },
+  "templates_aa/chars/mineta.png": {
+   "sha256": "171d75137a5862801c26977c5708efbebaec61966eacf5c2666f0084d3831981",
+   "size": 21970
+  },
+  "templates_aa/chars/mirio.png": {
+   "sha256": "f2122eb1d5197bbcc0e0c239344628d17c8992229503527a1f31998db174389b",
+   "size": 28313
+  },
+  "templates_aa/chars/momo.png": {
+   "sha256": "52e5787b084e8cabff5363b84c2085011f9435334ea2d1a909a401a4a7785825",
+   "size": 25046
+  },
+  "templates_aa/chars/nejire.png": {
+   "sha256": "ab427b9d0b3e3c76b0e29442e5a0b05701e2cf1bfd9aaccba0b0bf405ab6d4c2",
+   "size": 32409
+  },
+  "templates_aa/chars/ochaco.png": {
+   "sha256": "2f1d4e4939776b8479e278dd2de7d312dd16b68e2a4c533f08138e3ccf0a3cb8",
+   "size": 33490
+  },
+  "templates_aa/chars/ojiro.png": {
+   "sha256": "59e798c79bffd8875e22969eeca508dee1d7ee7b9ed6fdeb7a8c2d36d20ce2c0",
+   "size": 24943
+  },
+  "templates_aa/chars/shigaraki.png": {
+   "sha256": "d78a58270c9676b6cba9dec24c391e5be6157805b96c635febefa5871837d627",
+   "size": 13854
+  },
+  "templates_aa/chars/shoto.png": {
+   "sha256": "5d7ffddf7b0269348c285e81c3ae96e564fed90785f57969ccfc92cf1564d2ae",
+   "size": 32777
+  },
+  "templates_aa/chars/stain.png": {
+   "sha256": "67e052d5bb4a872e3414c29e574020cbe269d172d32afa7367b97b5c3d333e92",
+   "size": 24404
+  },
+  "templates_aa/chars/tamaki.png": {
+   "sha256": "3c8e0d068cfee1080cb724886141f3b5ec9c3febdc92d2f16ff37972c3996855",
+   "size": 8669
+  },
+  "templates_aa/chars/tsuyu.png": {
+   "sha256": "948fff19c20cc6c33e7f798985be4d97219b7d13b562466660196df275b2efbc",
+   "size": 28644
+  },
+  "templates_aa/chars/wheku.png": {
+   "sha256": "a41b6bc3a25c8070f7f4be7c3167bd558c2ddc42efb961fc1345205547481576",
+   "size": 28668
+  },
+  "templates_aa/chars/whoto.png": {
+   "sha256": "d2dd96b93ba4aea399dd1a07b47f4849cede44f40ef3a84d30f2c760b2863fe7",
+   "size": 28712
+  },
+  "templates_aa/charstamina0.png": {
+   "sha256": "7e0e1e465ee1908b5fcf22d454246689269de5489bc4a78939d4e3300a7f0e2a",
+   "size": 4520
+  },
+  "templates_aa/charstamina1.png": {
+   "sha256": "0a4bcdf90a2becbc688339f89314fe1c8a9f03b0c2025ec8ec471325980129d7",
+   "size": 4120
+  },
+  "templates_aa/charstamina2.png": {
+   "sha256": "e7b0c3265226a609891606fd9967f654383306eab3f88e32cdb8d2c4d6bb27ff",
+   "size": 4247
+  },
+  "templates_aa/closebots.png": {
+   "sha256": "55f9a31c2fe4a7f8f955b59fccfb51c729aade59b4b09346e63fd170127da5ff",
+   "size": 12951
+  },
+  "templates_aa/closereset.png": {
+   "sha256": "0b6e118aa04135b46319fadce93e733dcded6c8b9cd3a035068a6545288debbc",
+   "size": 13234
+  },
+  "templates_aa/confirmreset.png": {
+   "sha256": "adcfcf7d5be15b445c704fdbaa0dc5a3c3172d390d6a977418b530584a56ebaa",
+   "size": 25535
+  },
+  "templates_aa/coop.png": {
+   "sha256": "48d2ada7281331f2d436ab9bb5747f383f5777765a23bf593307af169d0c4a42",
+   "size": 45504
+  },
+  "templates_aa/createteam.png": {
+   "sha256": "4c3fc30e0d8d8ae02853b4fad26ea4aa39f4b31c56322807423707b4e843b06d",
+   "size": 19595
+  },
+  "templates_aa/deku.png": {
+   "sha256": "1af5d9ad190dc205eef02573cc13696d498d915dd064784d34074663b42bd2e6",
+   "size": 41640
+  },
+  "templates_aa/denki.png": {
+   "sha256": "8b02a9de430509e394bd35210c3f6a49ceb5971426953f222daff951a14876b7",
+   "size": 41585
+  },
+  "templates_aa/deploy.png": {
+   "sha256": "880631c2dd193b991f634957c07048e4bfdf254a319a56b59c6a27bcd107d322",
+   "size": 24811
+  },
+  "templates_aa/digits/0.png": {
+   "sha256": "698bd12f120977f0ee2f8b689d426bc8e8cd55edf4f5eea2cdb8825b8c7dc0d0",
+   "size": 166
+  },
+  "templates_aa/digits/1.png": {
+   "sha256": "79097515c07bc633717c45a3e6a3905617697e0bf1cfb6640df92b3a9f2846fb",
+   "size": 117
+  },
+  "templates_aa/digits/3.png": {
+   "sha256": "41ce4deb5fc67f19319602769ff042f762e6381d2a8890d402a98f41d729deb1",
+   "size": 158
+  },
+  "templates_aa/digits/4.png": {
+   "sha256": "72d0cb52ac5b3bab8575f27d52fd66c4123b8d2c09d1349b0a50f6032581184d",
+   "size": 164
+  },
+  "templates_aa/digits/7.png": {
+   "sha256": "538dc4d2d44e53281b8bc721b65573e74f3b97332e0cddbc2defbff48745437e",
+   "size": 163
+  },
+  "templates_aa/eijiro.png": {
+   "sha256": "fd6859cf8d719695837b970e70754ea05daed50f619ffdb7d45124d3a6eb7299",
+   "size": 39536
+  },
+  "templates_aa/fumikage.png": {
+   "sha256": "ea454c21f52404328c12a9ed431a5d39b0e6a7b3a5565e371fd6a7cc4b13cc65",
+   "size": 38134
+  },
+  "templates_aa/insertpermit.png": {
+   "sha256": "97439840014524aebf78b5dff9bf42e5a09bef1c10010d1d160d706e6410026b",
+   "size": 42497
+  },
+  "templates_aa/jointeam.png": {
+   "sha256": "e9bc617d303a13d984ee4f6a7d4939304d58eab2bdd90d9c213f0fb62b67b39a",
+   "size": 20838
+  },
+  "templates_aa/momo.png": {
+   "sha256": "bc4f000d074ee13fe15a9c45a671b3dd22f897ac0658d07392afd077a79e6477",
+   "size": 41285
+  },
+  "templates_aa/mypermit.png": {
+   "sha256": "9207522cbf1f2c914ac6557b5d273a8843782108f2d4f29c79cf3d6a56287a08",
+   "size": 10507
+  },
+  "templates_aa/myteam.png": {
+   "sha256": "95c996267da9f9f52a80fe745f61e2e646af5771fd10b0ef6f679929a39df1a1",
+   "size": 18859
+  },
+  "templates_aa/nostamina.png": {
+   "sha256": "4896ff123bea3944a07c222f3b47b158c344a53f7b305da550ace5b36c0aca79",
+   "size": 17401
+  },
+  "templates_aa/ochaco.png": {
+   "sha256": "61da103ab41e7cc35b985f191c27def6e31c40078610a89b4e8700aa482fe057",
+   "size": 41808
+  },
+  "templates_aa/permit.png": {
+   "sha256": "ea0b86d5f0ca9ab486932725eb26006e9e67f72fe47d43b8af648e0c9eff5430",
+   "size": 90630
+  },
+  "templates_aa/recruit.png": {
+   "sha256": "66a67c1dfc7612802b46a39dfaf4dca1aad93b618a8f96fa3873048e15d4fb29",
+   "size": 15264
+  },
+  "templates_aa/resetpermit.png": {
+   "sha256": "f62722721499c983548dd8786522b489e61a36b89f6f04acaf631c6cc2d3f9ec",
+   "size": 28122
+  },
+  "templates_aa/return.png": {
+   "sha256": "23eb40cb949bbbbc6a6535df73b1bab61b023611ff35eef6b9bf9bdbee3483ef",
+   "size": 20757
+  },
+  "templates_aa/revivefree.png": {
+   "sha256": "68dba5bf6c20900c661822c601ff36197a405a6d73b6877c9f2d541c153b2ff6",
+   "size": 38375
+  },
+  "templates_aa/shoto.png": {
+   "sha256": "874548fd63f153642a2f7a50bc7e489b45f16555fcd6e8f9447b28bd2fa14dd4",
+   "size": 41434
+  },
+  "templates_chars/allmight.png": {
+   "sha256": "20ce4df2c9d02989a71041d86dc390a3c6d4da678bde638e72debe4cd2cf02a8",
+   "size": 56805
+  },
+  "templates_chars/deku.png": {
+   "sha256": "b90264a7a8aee1a41aaf8bbce44b2ef2a91fc746f63141de33562f2785ddd43c",
+   "size": 65802
+  },
+  "templates_chars/denki.png": {
+   "sha256": "16a061529ccd18d9e60d6be4d55826085a332d644abf874780c40828bfea43e7",
+   "size": 65628
+  },
+  "templates_chars/ende.png": {
+   "sha256": "97a0122e2e95d46f13233399574e74834d78d17fc90256076263c9c4735785b8",
+   "size": 63399
+  },
+  "templates_chars/iida.png": {
+   "sha256": "3b370256d2203d112be2d578ce0d15d8d46efca10dfc040d5429baabfaba1735",
+   "size": 54444
+  },
+  "templates_chars/mirio.png": {
+   "sha256": "14a5c8f0b6b2bb046162e16e12d3a73b469b71fcc177e70156bdd7297fa74b1c",
+   "size": 49657
+  },
+  "templates_chars/nejire.png": {
+   "sha256": "7c7826633e2b83e3421291387af4c6b8afb1d9e501c96736c69f88d0d5e0a5f5",
+   "size": 56870
+  },
+  "templates_chars/ochaco.png": {
+   "sha256": "5b1fd044fd4e3c605949e10facf2d3639e2b223d0c28e9a6997b8e36fc41fa44",
+   "size": 51596
+  },
+  "templates_chars/stain.png": {
+   "sha256": "c00c53440468e27db755c3ecdc22f5efe7d3802fcaf7954078ad0e4a1705b212",
+   "size": 48098
+  },
+  "templates_chars/tsuyu.png": {
+   "sha256": "928a7020dba03b71f4d47de1264b231752a41c77ba05613190a68436c7bf3d6e",
+   "size": 50559
+  },
+  "templates_hero/again.png": {
+   "sha256": "fa3d72ec9d0d6ae5bdee530c2ece8f74bb6baca8c3db8d635fd525b1b0948391",
+   "size": 16847
+  },
+  "templates_hero/am.png": {
+   "sha256": "20ce4df2c9d02989a71041d86dc390a3c6d4da678bde638e72debe4cd2cf02a8",
+   "size": 56805
+  },
+  "templates_hero/attempt.png": {
+   "sha256": "37a36ad26936b043098edd8bf762295dd9f091db5e27613e20e4d347d3bb7aaa",
+   "size": 16311
+  },
+  "templates_hero/auto.png": {
+   "sha256": "ef45434b8762d18593898e553a2503b6614227cb36699c30f77e5c1b9f29451c",
+   "size": 6891
+  },
+  "templates_hero/challenge.png": {
+   "sha256": "cd9a0afb8565d190b6cd829330035ed4fa9879a92bd015f9b6890f389acde31e",
+   "size": 26997
+  },
+  "templates_hero/deku.png": {
+   "sha256": "80fc67aafa8742f3799d2b2e48853e9a79f875fcfc0ed7681a5c1b294ac1d2a4",
+   "size": 272684
+  },
+  "templates_hero/denki.png": {
+   "sha256": "f15f8e9aac8ad15972716619a6ec15b2c8ff1b6bc95435a9f91c937d2dc9a13a",
+   "size": 249097
+  },
+  "templates_hero/eijiro.png": {
+   "sha256": "51292e5527715a4901ffca6b6dd6bcce58968920e8b2a2aac61fa1f530bd19b7",
+   "size": 252790
+  },
+  "templates_hero/exit.png": {
+   "sha256": "92c649bb75dfcafa0dfc7213961a0066984e41b0b49a919183ec2e3e572187fd",
+   "size": 12221
+  },
+  "templates_hero/herotrial.png": {
+   "sha256": "ebf1ab08d7cf87dcc8d192e1f510dcc6d1f8c859addd1f5dbd64b3ccd90ef411",
+   "size": 38469
+  },
+  "templates_hero/iida.png": {
+   "sha256": "27050d7b6577379a9902dc3ba0c905d5a6c24f9d7399bb58101d1d6c57f4a8b0",
+   "size": 251206
+  },
+  "templates_hero/insufficient.png": {
+   "sha256": "f54e07c13a131962693d56a3c163075178e55c6cba6216ab2771594bf7a2a21a",
+   "size": 13690
+  },
+  "templates_hero/mineta.png": {
+   "sha256": "b5a28b08dfaa68112471645ee3624251f97f8725ce5dd0af281214220f1137c8",
+   "size": 252422
+  },
+  "templates_hero/ochaco.png": {
+   "sha256": "60578800ff228f4a9c232ce8ac1d934d8847dbd9d015f6c399b1b900b0bd32de",
+   "size": 256813
+  },
+  "templates_hero/plus.png": {
+   "sha256": "772e4ca0ef8d0c0a269b99541fe2ca55ba70ee6b72a5270cebec92c6abf199d9",
+   "size": 22949
+  },
+  "templates_hero/solo.png": {
+   "sha256": "a1f20abc2fe5d86c9acc82f4c7a6a3b5f9d87e21278f4d4c64ffe7f232aebb38",
+   "size": 29268
+  },
+  "templates_hero/tsuyu.png": {
+   "sha256": "2147b0a804cf738d4efa7feecae7bcc3516d51d13c06a8048c882a3a4bce6709",
+   "size": 267440
+  },
+  "templates_hero/ua.png": {
+   "sha256": "e7f751b4b2f375c823741daaeb2df32a05c11f0836af1575704f5817ee6c4535",
+   "size": 46937
+  },
+  "templates_nightops/am.png": {
+   "sha256": "20ce4df2c9d02989a71041d86dc390a3c6d4da678bde638e72debe4cd2cf02a8",
+   "size": 56805
+  },
+  "templates_nightops/auto.png": {
+   "sha256": "ef45434b8762d18593898e553a2503b6614227cb36699c30f77e5c1b9f29451c",
+   "size": 6891
+  },
+  "templates_nightops/challagain.png": {
+   "sha256": "0bd6afa13994d0bcc57032491ad50ff3eff92a0c31e98b5b131324c2a650a87e",
+   "size": 23601
+  },
+  "templates_nightops/challenge.png": {
+   "sha256": "e5249bc94ebe5e70ef77db4ce9e470beecb8d61a6a8e00666265ad25782b8530",
+   "size": 28558
+  },
+  "templates_nightops/continue.png": {
+   "sha256": "8e1b93ab66edbd2b4a6de4756dfbd32ec62958e17f81983ed2c7b6d0f58fef60",
+   "size": 5934
+  },
+  "templates_nightops/controlbattle.png": {
+   "sha256": "a487057b348c883c51c2542dfef5a7281d24bf7622a81447f2118ff23e5792f6",
+   "size": 23330
+  },
+  "templates_nightops/max.png": {
+   "sha256": "740b438b76c0f1f872713a1f8e4f387d07eede5c851949b560c0f753a06a8e23",
+   "size": 7546
+  },
+  "templates_nightops/multirun.png": {
+   "sha256": "07976d576c92e5c35784cc0565da9e09b540499cf7828e0052269da311fc9730",
+   "size": 16264
+  },
+  "templates_nightops/nightops.png": {
+   "sha256": "238c72740de9ddb3f3c343b2d546dccd40b9ceb28d8abf1fcdd8297667b8023e",
+   "size": 38064
+  },
+  "templates_nightops/plus.png": {
+   "sha256": "d7e5e96f17b8df539f1ff62df6e496237519205703d04016b252eedcd0a85eec",
+   "size": 19075
+  },
+  "templates_nightops/solo.png": {
+   "sha256": "a1f20abc2fe5d86c9acc82f4c7a6a3b5f9d87e21278f4d4c64ffe7f232aebb38",
+   "size": 29268
+  },
+  "templates_nightops/start.png": {
+   "sha256": "babc103ed1d1f93bdb7d4de89c59051edfa41563a2d97e0633a841815a96a2fa",
+   "size": 25012
+  },
+  "templates_nightops/ua.png": {
+   "sha256": "e7f751b4b2f375c823741daaeb2df32a05c11f0836af1575704f5817ee6c4535",
+   "size": 46937
+  },
+  "templates_slot/LISEZMOI.txt": {
+   "sha256": "1e7ecf39b37e3824b264a990dba6dab96b4c3ae97fd4214b5167af8ba229f8bb",
+   "size": 600
+  },
+  "templates_slot/allmight.png": {
+   "sha256": "e9c03745188dc3bbd50dbd7517ba08aa40225d0b282d596eb3e4d640be0631f2",
+   "size": 68965
+  },
+  "templates_slot/deku.png": {
+   "sha256": "ff314769e774e9967e9dd1d5423cb3b214f5dd7447940ccf6fffe157a3612cdb",
+   "size": 68223
+  },
+  "templates_slot/denki.png": {
+   "sha256": "41a1d62296b8f83910b1de63319c21f14760ee845b2873eebd5d08026e4267e7",
+   "size": 66795
+  },
+  "templates_slot/ende.png": {
+   "sha256": "87356848c5c0a2c83d0c29e0d8978b85642490fd08c59f18edda89d38cd91d22",
+   "size": 66367
+  },
+  "templates_slot/iida.png": {
+   "sha256": "3a1edcaf053a905d8c83beb1ed76768ec979795c62f5f37ed0bf0e422dc1102f",
+   "size": 62628
+  },
+  "templates_slot/mirio.png": {
+   "sha256": "10c135d70538071d55c924c6c5194fa9531d3aff4b577638604878cd4a20e268",
+   "size": 76832
+  },
+  "templates_slot/nejire.png": {
+   "sha256": "f4dfa622cf4d70b5974e468916bfe39891e35cdec630dc596da3d07dbd614303",
+   "size": 75520
+  },
+  "templates_slot/ochaco.png": {
+   "sha256": "605423091e69ee5f6d26d79ea23b8df03292652011f5f632d4728292d8f20e26",
+   "size": 67247
+  },
+  "templates_slot/stain.png": {
+   "sha256": "433bc7cc2dffcaee7c3aca427d3b31c5c93887e4034e6f852f357b4cee28d0c7",
+   "size": 57088
+  },
+  "templates_slot/tsuyu.png": {
+   "sha256": "99f9cf80cc1d05c6f67e7ab2fdd2cb3a064d5185480768ab669e1c646c007779",
+   "size": 81530
+  },
+  "templates_stamina/cadeau.png": {
+   "sha256": "f4c5f222ba734b49d9dddfab77c59299f8bb4467edafe68473cac1f0ed174771",
+   "size": 3972
+  },
+  "templates_stamina/closestam.png": {
+   "sha256": "136cafd03794eaa239a19167deef1012f6fc1efe7e4a9556deefa12eab8eb421",
+   "size": 9957
+  },
+  "templates_stamina/code.png": {
+   "sha256": "f2175dcb5f99bee43a247c7e1a05ab8b9bafdf18182a5803161604501cb30dfb",
+   "size": 25432
+  },
+  "templates_stamina/codearea.png": {
+   "sha256": "aff57ee532f31a4a3627dadd2cc220653d48ebdc145265a373923fb419e6a04f",
+   "size": 654097
+  },
+  "templates_stamina/insustam.png": {
+   "sha256": "a87972e1a4ee1432361aa0aac510c79ea55b010903e713d54285a39abb2a9fc4",
+   "size": 22936
+  },
+  "templates_stamina/insustam2.png": {
+   "sha256": "287349077e7fce94cac3acdd0b3165f0d61a260a6abeca70935017c2c21b60ff",
+   "size": 28709
+  },
+  "templates_stamina/morestam.png": {
+   "sha256": "bce756a548d43deb82217abc8565d3bf09390e24539fa3d6c962eb61796995cb",
+   "size": 872139
+  },
+  "templates_stamina/take.png": {
+   "sha256": "4238980f7888d23e8b7f63594861e7b5f33cf68d8f98f03a8abb0d56bf458bb2",
+   "size": 12146
+  },
+  "templates_supply/card.png": {
+   "sha256": "6ee73766f71c6587cc2468aa4ca782b30ce5fec7ad2225b5cd5bee1c87717216",
+   "size": 358020
+  },
+  "templates_supply/challagain.png": {
+   "sha256": "44a1a39669de4ce6e218c3a8555e13eb7c95fa181981a15ac1d49a92bc024da0",
+   "size": 19020
+  },
+  "templates_supply/confirm.png": {
+   "sha256": "154e3c1c3a029110d1e732344bb596db917dd0320219f4df56166e7277f13e47",
+   "size": 27865
+  },
+  "templates_supply/continuechall.png": {
+   "sha256": "ff725200e3c8f707ca8c289117c0030a18161dd7da8b9080a0426007f7067097",
+   "size": 18231
+  },
+  "templates_supply/crystals.png": {
+   "sha256": "f1cd21fad65f8d52f7d93877e517339fb0dff4fab9b446b2f4fcadf2c62a9df3",
+   "size": 276264
+  },
+  "templates_supply/food.png": {
+   "sha256": "57ab3486aabd009f8d520e19e960e2b98d0bf0763eb99c4b39e79f45629a2704",
+   "size": 387303
+  },
+  "templates_supply/gear.png": {
+   "sha256": "cc086b44de00d1b416119b44973a8d956fd4e3c7f758fe247f0fed7bd6f82a82",
+   "size": 370270
+  },
+  "templates_supply/lvlcard.png": {
+   "sha256": "5396234be5869b918ee307a66276719880c28f40ad84c7fcee7a10753e81d877",
+   "size": 699379
+  },
+  "templates_supply/lvlcrystals.png": {
+   "sha256": "9f3c72edc7394fdbae45c149cd2ff082bc25dbae3e32700b6e8f8ca6cde439c0",
+   "size": 744286
+  },
+  "templates_supply/lvlfood.png": {
+   "sha256": "53cbf74eb5cccb3dc6e2bbfe6cb1c21ccfba178277713d2f386a193923ac074e",
+   "size": 636755
+  },
+  "templates_supply/lvlgear.png": {
+   "sha256": "5822aca39232a6422ba4079fbcfbf8dcdeed1b5538e5fb11ea16057a5dc3f68c",
+   "size": 341303
+  },
+  "templates_supply/lvlmoney.png": {
+   "sha256": "bf6f93e9a05d4dfd33fe0e0bbfda50ba854cf4fe1c3b756f603d698d2cdbfbe0",
+   "size": 779164
+  },
+  "templates_supply/money.png": {
+   "sha256": "9e8ad1c99fa97f9a38d5d3417517877b7e7454d659422463d03269410f62c486",
+   "size": 421851
+  },
+  "templates_supply/supply.png": {
+   "sha256": "3f77026dd42fe705d50afb94ba0d723556632134a53a8c1164f94ec0b83d17b1",
+   "size": 34978
+  },
+  "templates_watchdog/croixpub.png": {
+   "sha256": "c5c85452e2491f0aba189f33d0a5066478542a39a4dccb170b8b6a8bf0a0ea64",
+   "size": 1322
+  },
+  "templates_watchdog/iconeacc.png": {
+   "sha256": "3d9b8bcbd60663e33d734d08eb1158631bcd2e51b0a96bfe9bbd7433a5cd3251",
+   "size": 12462
+  },
+  "templates_watchdog/iconverte.png": {
+   "sha256": "114eea6fdbcdfd5c95bfe6a88a3c1956e793649095ac9a644314d2654feb1d41",
+   "size": 21569
+  },
+  "templates_watchdog/maintenance.png": {
+   "sha256": "d43ec4062e0c9da341e56df92250de4462aa8afb7b6b3857b7e06b7362295f38",
+   "size": 33380
+  },
+  "templates_watchdog/restart.png": {
+   "sha256": "e40a94644d83805cccdd80541d8ce313057ca812a3da9572c9f7c88b5bd37b4c",
+   "size": 29909
+  },
+  "templates_watchdog/understood.png": {
+   "sha256": "e8a88c73008bf5a2b65a31d7b46fa3f462bf93c9ce5cd83797ffbfcb7fc21ba6",
+   "size": 28013
+  },
+  "templates_whm/entrance.png": {
+   "sha256": "01ae1ee956299855d7bb9b2caddd1a14c8fcbe2458cbf45ad0875bdf5f3b4a60",
+   "size": 148734
+  },
+  "templates_whm/entrance2.png": {
+   "sha256": "e0251a57b23220dc69214916e4cb9fb9bdcc936821107642b522258fc647ba48",
+   "size": 119845
+  },
+  "templates_whm/hallway.png": {
+   "sha256": "9fc0743d8fb10fc9298351ca9c986e2bdfbd042da1867092e3175d5273df9bc8",
+   "size": 119215
+  },
+  "templates_whm/hallway2.png": {
+   "sha256": "91ca6e35f3d24e3842e3d2253c19de7fe24b8fe39632325874866c9755e3f251",
+   "size": 114304
+  },
+  "templates_whm/hallwaylvl1.png": {
+   "sha256": "a7d46ed1cd59839ce8fd40c73cd998cb96003e05134bf379dff3aa630e93204e",
+   "size": 220854
+  },
+  "templates_whm/hallwaylvl2.png": {
+   "sha256": "09562eecdb06c69e1fa7f966844ebcf65bc64ceb26522ce44bf47c76fa014036",
+   "size": 199853
+  },
+  "templates_whm/hallwaylvl3.png": {
+   "sha256": "283565f49b0048049dcc9c3d8516b5caa869635579c41d0a58e3f1b1e001dac5",
+   "size": 223345
+  },
+  "templates_whm/library.png": {
+   "sha256": "51f5e3f88d529bb6f11505fca69c13818f997f02614bb247285feec1a91f3963",
+   "size": 139570
+  },
+  "templates_whm/library2.png": {
+   "sha256": "822d0b8b60b244e06418e9fe4e0c1a3d6152e296bbcd7e57f14af56b78af7153",
+   "size": 85273
+  },
+  "templates_whm/librarylvl1.png": {
+   "sha256": "bcd440bd5c058faa8618c32c9dda6f911c39854898cf3673ded3bd27b27cb2c8",
+   "size": 184988
+  },
+  "templates_whm/librarylvl2.png": {
+   "sha256": "c473b79a192f418af285fe1d3fb6ef1768b38e45c73b9874b4c8334b841d45ae",
+   "size": 155609
+  },
+  "templates_whm/librarylvl3.png": {
+   "sha256": "ad10f0ffe91e0e2bb2731931a527efbd9019537f33b0b513b10c63d13db9caea",
+   "size": 174233
+  },
+  "templates_whm/plusieursfois.png": {
+   "sha256": "e3e9a26ae7638c4c3f5e391ddf6392f8928277d5e90654510058f8045919dbaa",
+   "size": 49600
+  },
+  "templates_whm/slot/LISEZMOI.txt": {
+   "sha256": "e75b7b6da212b2b71c4cf29c78719ced5113c59e381ae3d439278f7170a9d906",
+   "size": 720
+  },
+  "templates_whm/whmchallenge.png": {
+   "sha256": "98b2d1129bf02c1c679fc9ed794e130130495bf333aaedf299ff8a52614d5293",
+   "size": 32448
+  },
+  "templates_whm/whmchallengeagain.png": {
+   "sha256": "e493a257279596c4e1e73dae3f57cea205e9058258cd667c495dbc350437e81b",
+   "size": 21903
+  },
+  "templates_whm/whmevent.png": {
+   "sha256": "a23752c749546bfdd9459603f51414693caee7a49266e05ded6a8be477e7b4ce",
+   "size": 20812
+  },
+  "templates_whm/whmlvl1.png": {
+   "sha256": "28d7c4f48a30da40e4e98d5c4b738957d126d782871bb8c246c8946d15143890",
+   "size": 222936
+  },
+  "templates_whm/whmlvl2.png": {
+   "sha256": "d51c65c0e53cb0aef9e48b1cd5874e16c3158fd681d27ddbc92270fef655aa9c",
+   "size": 213248
+  },
+  "templates_whm/whmlvl3.png": {
+   "sha256": "0df0d3c635e16e5a6109565cfbda7d07b54150173b005d1b681e2881b74363b5",
+   "size": 214326
+  },
+  "updater.py": {
+   "sha256": "47a06d4724a170f2a2a81d9d54102df7568bad022ac3361330f3e1f54345b707",
+   "size": 13419
+  },
+  "watchdog.py": {
+   "sha256": "edba49b498384fda6e6a7785894eaee732ebd245a81bff3f13c60480ecabeae5",
+   "size": 23801
+  }
+ }
+}

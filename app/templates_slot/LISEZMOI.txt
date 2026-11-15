@@ -1,0 +1,6 @@
+Portrait de chaque perso DANS l'emplacement du panneau lateral (la ou s'affiche le "+" quand personne n'est place).
+Un fichier par perso, nom = celui de templates_chars/ : allmight ende deku denki stain tsuyu ochaco iida nejire mirio.
+Le bot Hero Trial s'en sert pour savoir QUEL perso est deja place quand le "+" n'est plus visible. Seule l'illustration est
+comparee (le BP et le badge de rang du bas n'ont aucun effet).
+Ajouter un perso : capture l'emplacement avec ce perso place (meme resolution que l'emulateur), recadre-le comme les autres
+et enregistre-le ici sous son nom (ex. todoroki.png).

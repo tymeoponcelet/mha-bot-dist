@@ -1,0 +1,10 @@
+{
+  "token": "COLLE_ICI_LE_TOKEN_QUE_TON_AMI_TE_DONNE",
+  "allowed_user_ids": [
+    123456789012345678
+  ],
+  "guild_id": 1570578642612785283,
+  "sync_commands": false,
+  "public_replies": false,
+  "result_channel_id": null
+}
