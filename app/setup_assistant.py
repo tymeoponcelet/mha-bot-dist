@@ -33,6 +33,7 @@ import profils                 # profils de configuration (profils.json)
 import encours                 # farm en cours, partage avec Discord et le planning
 import refaire                 # refaire une image de bouton depuis une capture
 import sauvegarde              # sauvegardes des reglages (logs/sauvegardes)
+import instances              # 2 comptes : instances MuMu
 import heroes as hz            # liste / noms des persos (templates_chars/) ; n'a pas besoin d'opencv ici
 
 BASE = Path(__file__).resolve().parent
@@ -78,6 +79,11 @@ CHAIN_BOT = BASE / "enchainer.py"
 HERO_ORDER = ["ochaco", "iida", "tsuyu", "deku", "denki", "eijiro", "mineta"]
 PORTS = ["127.0.0.1:16384", "127.0.0.1:7555", "127.0.0.1:5555", "127.0.0.1:62001"]
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def console_python():
+    """python.exe meme si l'assistant tourne sous pythonw.exe (farms : console cachee, adb sans fenetre)."""
+    return str(Path(sys.executable).with_name("python.exe")) if Path(sys.executable).name.lower() == "pythonw.exe" else sys.executable
 
 # --- palette ---
 BG, CARD, BORDER = "#0e1320", "#171f33", "#2a3552"
@@ -352,6 +358,7 @@ class App(tk.Tk):
         self.after(600, self.run_verif)                          # verification automatique a l'ouverture
         self.after(1000, self.watch_ext)                         # farm en cours lance ailleurs : affiche + Stop
         threading.Thread(target=sauvegarde.daily, daemon=True).start()   # sauvegarde quotidienne des reglages
+        self.after(800, self.refresh_instances)                  # 2 comptes : instances MuMu demarrees
 
     # ================= interface =================
     def setup_style(self):
@@ -686,6 +693,20 @@ class App(tk.Tk):
         self.run_bar.pack(fill="x", pady=(4, 2))
         self.stats_lbl = tk.Label(info, text="Run 0/0   ·   ⏱ 00:00", bg=CARD, fg=MUTED, font=F(9), anchor="w")
         self.stats_lbl.pack(fill="x")
+        # --- 2 comptes : instance du farm (visible seulement si 2 instances MuMu sont demarrees) ---
+        self.inst_row = tk.Frame(info, bg=CARD)
+        tk.Label(self.inst_row, text="📱 Instance", bg=CARD, fg=TEXT, font=F(10, True)).pack(side="left")
+        self.inst_combo = ttk.Combobox(self.inst_row, width=40, state="readonly")
+        self.inst_combo.pack(side="left", padx=(8, 0))
+        tk.Label(self.inst_row, text="(2 comptes : jamais le même script sur les deux)", bg=CARD, fg=MUTED,
+                 font=F(8)).pack(side="left", padx=(8, 0))
+        self.others_row = tk.Frame(info, bg=CARD)
+        self.others_lbl = tk.Label(self.others_row, text="", bg=CARD, fg=YELLOW, font=F(9, True), anchor="w", justify="left")
+        self.others_lbl.pack(side="left", fill="x", expand=True)
+        self.others_stop = Btn(self.others_row, "⏹ Stop", self.stop_others, bg=RED, fg="#ffffff", size=9, padx=10, pady=2)
+        self.others_stop.pack(side="right")
+        self.inst_items, self.proc_device, self.others = [], None, []
+        self.run_mode, self.run_chain = self.mode, list(self.chain_steps)
 
         # --- journal ---
         self.logbox = tk.Text(self.body, height=9, bg="#0a0e18", fg="#b8c4e6", font=("Consolas", 9),
@@ -750,7 +771,7 @@ class App(tk.Tk):
         txt.config(bg=GREEN if on else GREY, fg=DARK if on else TEXT, text=("✔ " if on else "") + name.capitalize())
 
     def toggle_char(self, name):
-        if self.proc:
+        if self.locked():
             return
         self.sel.symmetric_difference_update({name})
         self.paint_chip(name)
@@ -759,7 +780,7 @@ class App(tk.Tk):
         self.refresh_all()
 
     def select_all(self, on):
-        if self.proc:
+        if self.locked():
             return
         self.sel = set(self.chars) if on else set()
         for n in self.chars:
@@ -821,7 +842,7 @@ class App(tk.Tk):
         self.pick_lbl.config(text=hz.pretty(self.pick))
 
     def set_pick(self, name):
-        if self.proc:
+        if self.locked():
             return
         self.pick = name
         self.paint_pick()
@@ -862,7 +883,7 @@ class App(tk.Tk):
         self.sup_lbl.config(text=f"{SUPPLY_MODES[self.sup_mode]} · niveau {['I', 'II', 'III', 'IV'][self.sup_level - 1]}")
 
     def set_sup_mode(self, name):
-        if self.proc:
+        if self.locked():
             return
         self.sup_mode = name
         self.paint_supply()
@@ -894,7 +915,7 @@ class App(tk.Tk):
         self.paint_aa()
 
     def toggle_aa_bot(self, b):
-        if self.proc:
+        if self.locked():
             return
         if b in self.aa_bots:
             self.aa_bots.remove(b)
@@ -905,7 +926,7 @@ class App(tk.Tk):
         self.save_aa()
 
     def toggle_aa_res(self, n):
-        if self.proc:
+        if self.locked():
             return
         if n in self.aa_reserved:
             self.aa_reserved.remove(n)
@@ -914,7 +935,7 @@ class App(tk.Tk):
         self.save_aa()
 
     def step_aa(self, what, d):
-        if self.proc:
+        if self.locked():
             return
         setattr(self, what, max(0, min(99, getattr(self, what) + d)))
         self.save_aa()
@@ -927,7 +948,7 @@ class App(tk.Tk):
         self.whm_lbl.config(text=f"{WHM_EVENTS[self.whm_event][0]} {self.whm_level}")
 
     def set_whm_event(self, ev):
-        if self.proc:
+        if self.locked():
             return
         self.whm_event = ev
         self.cfg["whm_event"] = ev
@@ -936,7 +957,7 @@ class App(tk.Tk):
         self.refresh_all()
 
     def set_whm_level(self, lv):
-        if self.proc:
+        if self.locked():
             return
         self.whm_level = lv
         self.cfg["whm_level"] = lv
@@ -945,7 +966,7 @@ class App(tk.Tk):
         self.refresh_all()
 
     def set_sup_level(self, lv):
-        if self.proc or lv > SUPPLY_MAX_LEVEL[self.sup_mode]:
+        if self.locked() or lv > SUPPLY_MAX_LEVEL[self.sup_mode]:
             return
         self.sup_level = lv
         self.paint_supply()
@@ -970,7 +991,7 @@ class App(tk.Tk):
         save_cfg(self.cfg)
 
     def set_chain_type(self, t):
-        if self.proc or t == self.chain_type:
+        if self.locked() or t == self.chain_type:
             return
         self.run_vals["chain"] = self.runs
         self.chain_type = t
@@ -978,7 +999,7 @@ class App(tk.Tk):
         self.apply_mode()
 
     def add_step(self):
-        if self.proc:
+        if self.locked():
             return
         try:
             st = self.chain_editor.get()
@@ -992,14 +1013,14 @@ class App(tk.Tk):
 
     def move_step(self, i, d):
         j = i + d
-        if self.proc or not 0 <= j < len(self.chain_steps):
+        if self.locked() or not 0 <= j < len(self.chain_steps):
             return
         self.chain_steps[i], self.chain_steps[j] = self.chain_steps[j], self.chain_steps[i]
         self.save_chain()
         self.paint_steps()
 
     def del_step(self, i):
-        if self.proc:
+        if self.locked():
             return
         del self.chain_steps[i]
         self.save_chain()
@@ -1007,7 +1028,7 @@ class App(tk.Tk):
         self.refresh_all()
 
     def clear_steps(self):
-        if self.proc or not self.chain_steps:
+        if self.locked() or not self.chain_steps:
             return
         self.chain_steps.clear()
         self.save_chain()
@@ -1087,7 +1108,7 @@ class App(tk.Tk):
         return (tdir / name).exists() or (self.mode == "supply" and (NIGHT_TPL / name).exists())
 
     def set_mode(self, mode):
-        if self.proc or mode == self.mode:
+        if self.locked() or mode == self.mode:
             return
         if self.mode in self.run_vals:
             self.run_vals[self.mode] = self.runs
@@ -1874,14 +1895,26 @@ class App(tk.Tk):
 
     # ================= bot =================
     def launch(self):
-        if self.proc:
-            return
-        ext = encours.read()
+        device = self.chosen_device()
+        detached = False
+        if self.proc:                                    # un farm de l'assistant tourne deja
+            if not device or device == self.proc_device:
+                return
+            detached = True                              # 2 comptes : 2e farm sur l'autre instance, suivi par le registre
+        if device:
+            clash = encours.conflict(self.script_name(), device, self.chain_tokens())
+            if clash and clash[1] != "instance occupée":
+                messagebox.showwarning("Même script sur l'autre instance", f"{clash[1]} :\n{encours.describe(clash[0])}\n\n"
+                                       "Deux comptes peuvent farmer en même temps, mais pas le même script.")
+                return
+            ext = clash[0] if clash else None
+        else:
+            ext = encours.read()
         if ext:
             if not messagebox.askyesno("Un farm tourne déjà", encours.describe(ext) +
                                        "\n\nL'arrêter et lancer celui-ci à la place ?"):
                 return
-            encours.stop()
+            encours.stop(None, ext)
             self.log(f"⏹ Farm arrêté pour lancer celui-ci : {ext.get('label', '?')}", RED)
             self.watch_ext(once=True)
         probs = self.problems()
@@ -1906,9 +1939,10 @@ class App(tk.Tk):
         self.cfg["stamina_refill"] = bool(self.refill_var.get())
         self.cfg["watchdog"] = bool(self.wd_var.get())
         save_cfg(self.cfg)
-        env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1", MHA_SOURCE="assistant")
+        env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1", MHA_SOURCE="assistant",
+                   **({"MHA_DEVICE": device} if device else {}))
         script = self.script_info()[0]          # meme source que la verification des images : un seul endroit a tenir a jour
-        cmd = [sys.executable, "-u", str(script)]
+        cmd = [console_python(), "-u", str(script)]      # jamais pythonw : ses adb ouvriraient une fenetre chacun
         if chain:
             self.save_chain()
             cmd += [self.step_token(st) for st in self.chain_steps]
@@ -1931,6 +1965,13 @@ class App(tk.Tk):
             cmd += ["--hero", self.pick]
         if self.mode in ("hero", "night", "supply", "whm"):
             cmd += [self.refill_flag(), self.wd_flag()]
+        if detached:                                     # 2e farm (autre instance) : suivi dans la ligne « Autre farm »
+            subprocess.Popen(cmd, cwd=BASE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env, creationflags=NO_WINDOW)
+            self.log(f"▶ Lancé sur {instances.label(device, self.inst_items)} (suivi dans la ligne « Autre farm »).", YELLOW)
+            self.after(1500, lambda: self.watch_ext(once=True))
+            return
+        self.proc_device = device
+        self.run_mode, self.run_chain = self.mode, list(self.chain_steps)   # suivi : independant de l'ecran (2 comptes)
         self.proc = subprocess.Popen(cmd, cwd=BASE, stdout=subprocess.PIPE,
                                      stderr=subprocess.STDOUT, text=True, encoding="utf-8",
                                      errors="replace", env=env, creationflags=NO_WINDOW)
@@ -1984,10 +2025,10 @@ class App(tk.Tk):
             self.action_lbl.config(text="🔋 Recharge de stamina (code cadeau)..." if "RECHARGE DE" in line else "🔋 Stamina rechargée", fg=YELLOW)
         if "defilement" in line:                 # le bot cherche le perso voulu en faisant defiler la liste
             self.action_lbl.config(text="↕ Recherche du perso : défilement de la liste", fg=YELLOW)
-        if self.mode == "chain":
+        if self.run_mode == "chain":
             if self.on_chain_line(line):
                 return
-        if self.mode == "hero" or (self.mode == "chain" and self.step_mode == "hero"):
+        if self.run_mode == "hero" or (self.run_mode == "chain" and self.step_mode == "hero"):
             self.on_hero_line(line)
             return
         m = re.search(r"\] (\w+) \(.*\| (?:multi-)?run (\d+)/(\d+)", line)
@@ -2003,7 +2044,7 @@ class App(tk.Tk):
         m = re.match(r"=+ Etape (\d+)/(\d+) : (.*?) =+", line)
         if m:
             self.chain_idx, self.chain_n = int(m.group(1)), int(m.group(2))
-            st = self.chain_steps[self.chain_idx - 1] if self.chain_idx <= len(self.chain_steps) else None
+            st = self.run_chain[self.chain_idx - 1] if self.chain_idx <= len(self.run_chain) else None
             self.step_mode = st["mode"] if st else None
             self.hero_done = set()
             self.done = 0
@@ -2042,9 +2083,9 @@ class App(tk.Tk):
 
     def update_stats(self):
         el = int(time.time() - self.t0) if self.t0 else 0
-        hero = self.mode == "hero" or (self.mode == "chain" and self.step_mode == "hero")
+        hero = self.run_mode == "hero" or (self.run_mode == "chain" and self.step_mode == "hero")
         label = "Persos" if hero else "Run"
-        pre = f"Étape {self.chain_idx}/{self.chain_n}   ·   " if self.mode == "chain" and self.chain_idx else ""
+        pre = f"Étape {self.chain_idx}/{self.chain_n}   ·   " if self.run_mode == "chain" and self.chain_idx else ""
         self.stats_lbl.config(text=f"{pre}{label} {self.done}/{self.total}   ·   ⏱ {el // 60:02d}:{el % 60:02d}")
 
     def tick(self):
@@ -2053,10 +2094,10 @@ class App(tk.Tk):
             self.after(1000, self.tick)
 
     def on_end(self, code):
-        finished = (self.chain_recap and self.chain_fail == 0) if self.mode == "chain" else self.done >= self.total
+        finished = (self.chain_recap and self.chain_fail == 0) if self.run_mode == "chain" else self.done >= self.total
         self.proc = None
         self.stop_btn.style(GREY, TEXT, enabled=False)
-        if self.mode == "chain":
+        if self.run_mode == "chain":
             self.paint_steps()
             if finished:
                 self.action_lbl.config(text=f"🎉 Enchaînement terminé : {self.chain_n} étape(s) réussie(s) !", fg=GREEN)
@@ -2067,7 +2108,7 @@ class App(tk.Tk):
                 self.action_lbl.config(text="⏹ Enchaînement arrêté.", fg=RED)
         elif finished:
             self.action_lbl.config(
-                text=(f"🎉 Mission accomplie : {self.done} perso(s) terminé(s) !" if self.mode == "hero"
+                text=(f"🎉 Mission accomplie : {self.done} perso(s) terminé(s) !" if self.run_mode == "hero"
                       else f"🎉 Mission accomplie : {self.done} run(s) terminé(s) !"), fg=GREEN)
             self.log("🎉 Terminé !", GREEN)
         else:
@@ -2092,7 +2133,21 @@ class App(tk.Tk):
     def watch_ext(self, once=False):
         """Toutes les 2 s : un farm lance depuis Discord / le planning / a la main tourne-t-il ? -> barre du bas + Stop."""
         try:
-            rec = None if self.proc else encours.read()
+            recs = encours.read_all()
+            mine = self.proc.pid if self.proc else None
+            self.others = [r for r in recs if r.get("pid") != mine]
+            multi = len(self.inst_items) >= 2
+            if self.proc or (multi and self.others):     # 2 comptes : les autres farms sur leur propre ligne
+                rec = None
+                self.show_others()
+                if not self.proc and multi:              # on peut lancer sur l'autre instance
+                    self.launch_btn.style(YELLOW, DARK, text="▶  LANCER  ·  PLUS ULTRA !")
+                    self.stop_btn.style(GREY, TEXT, enabled=False)
+                elif self.proc and multi:
+                    self.launch_btn.style(BLUE, DARK, text="▶  Lancer sur l'autre instance", enabled=True)
+            else:
+                self.show_others()
+                rec = self.others[0] if self.others else None
             if rec:
                 self.ext = rec
                 total = rec.get("total") or 1
@@ -2116,6 +2171,61 @@ class App(tk.Tk):
             pass
         if not once:
             self.after(2000, self.watch_ext)
+
+    # ---------------- 2 comptes ----------------
+    def refresh_instances(self):
+        def work():
+            try:
+                items = instances.listing()
+            except Exception:                                # noqa: BLE001
+                items = []
+            self.after(0, lambda: self.show_instances(items))
+        threading.Thread(target=work, daemon=True).start()
+
+    def show_instances(self, items):
+        self.inst_items = items
+        if len(items) >= 2:
+            cur = self.inst_combo.get()
+            vals = [instances.label(i["serial"], items) for i in items]
+            self.inst_combo.config(values=vals)
+            self.inst_combo.current(vals.index(cur) if cur in vals else 0)
+            self.inst_row.pack(fill="x", pady=(4, 0), before=self.stats_lbl)
+        else:
+            self.inst_row.pack_forget()
+
+    def locked(self):
+        """Reglages verrouilles pendant un farm de l'assistant ; 2 comptes : non (on prepare le farm de l'autre instance)."""
+        return bool(self.proc) and len(self.inst_items) < 2
+
+    def chosen_device(self):
+        """Instance choisie (2 comptes) ou None (une seule instance : comportement habituel)."""
+        if len(self.inst_items) < 2 or self.inst_combo.current() < 0:
+            return None
+        return self.inst_items[self.inst_combo.current()]["serial"]
+
+    def script_name(self):
+        return {"story": "histoire", "hero": "herotrial", "night": "nightops", "supply": "supply", "whm": "whm", "aa": "aa",
+                "chain": "enchainement"}.get(self.mode, self.mode)
+
+    def chain_tokens(self):
+        return [self.step_token(st) for st in self.chain_steps] if self.mode == "chain" else []
+
+    def show_others(self):
+        if self.others:
+            self.others_lbl.config(text="📱 Autre farm : " + "   |   ".join(encours.describe(r) for r in self.others))
+            self.others_row.pack(fill="x", pady=(4, 0))
+        else:
+            self.others_row.pack_forget()
+
+    def stop_others(self):
+        others = list(self.others)
+
+        def work():
+            for r in others:
+                encours.stop(None, r)
+            self.after(0, lambda: (self.log("⏹ Autre farm arrêté : " + ", ".join(r.get("label", "?") for r in others), RED),
+                                   self.watch_ext(once=True)))
+        threading.Thread(target=work, daemon=True).start()
 
     def on_close(self):
         if self.proc:

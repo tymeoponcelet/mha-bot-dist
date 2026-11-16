@@ -154,8 +154,13 @@ def emulator_state():
     return dev
 
 
-def screenshot_png():
+def screenshot_png(device=None):
     adb, dev = _adb()
+    if device:                                            # 2 comptes : l'instance demandee
+        import instances
+        if device not in instances.devices(adb):
+            return None
+        dev = device
     if not dev:
         return None
     r = subprocess.run([adb, "-s", dev, "exec-out", "screencap", "-p"], capture_output=True, timeout=30, creationflags=NO_WINDOW)
@@ -173,13 +178,15 @@ class Runner:
     def running(self):
         return self.proc is not None and self.proc.poll() is None
 
-    def start(self, cmd, label, on_end, emoji="🎮"):
+    def start(self, cmd, label, on_end, emoji="🎮", device=None):
+        self.device = device
         with self.lock:
             self.lines.clear()
             self.label, self.emoji, self.t0, self.stopped = label, emoji, time.time(), False
             self.cmd = list(cmd)                              # options reelles du farm (affichees par /panneau)
             self.proc = subprocess.Popen(cmd, cwd=BASE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                                         encoding="utf-8", errors="replace", env=dict(ENV, MHA_DISCORD="1", MHA_SOURCE="discord"),
+                                         encoding="utf-8", errors="replace",
+                                         env=dict(ENV, MHA_DISCORD="1", MHA_SOURCE="discord", **({"MHA_DEVICE": device} if device else {})),
                                          creationflags=NO_WINDOW)
             threading.Thread(target=self._read, args=(self.proc, on_end), daemon=True).start()
 
@@ -235,7 +242,31 @@ class Runner:
         return "⚙️ en route"
 
 
-runner = Runner()
+runner = Runner()                                       # instance par defaut (config.json)
+runners = {None: runner}                                # 2 comptes : un lanceur par instance MuMu
+
+
+def runner_for(device=None):
+    return runners.setdefault(device or None, Runner())
+
+
+class AnyRunner:
+    """Vue d'ensemble pour /maj : « un farm tourne-t-il quelque part ? »."""
+
+    def _first(self):
+        return next((r for r in runners.values() if r.running), runner)
+
+    @property
+    def running(self):
+        return any(r.running for r in runners.values())
+
+    @property
+    def label(self):
+        return self._first().label
+
+    @property
+    def emoji(self):
+        return self._first().emoji
 
 
 # ---------------------------------------------------------------- bot Discord
@@ -344,7 +375,8 @@ async def send_incident(d, info):
     files = incident_files(d)
     if any(f.name == "capture.png" for f in files):
         e.set_image(url="attachment://capture.png")
-    await send_owner(e, files, discord_ui.Actions(["capture", "statut", "stop"] if live else ["capture", "relancer"]))
+    await send_owner(e, files, discord_ui.Actions(["relancejeu", "capture", "statut", "stop"] if live
+                                                  else ["relancejeu", "capture", "relancer"]))
     mark_sent(d)
 
 
@@ -382,8 +414,9 @@ async def incident_watch():
             print(f"(!) envoi d'incident impossible : {ex!r}", flush=True)
 
 
-async def notify(code, stopped):
+async def notify(code, stopped, r=None):
     """Message prive a la fin d'un script (pas quand tu l'as arrete toi-meme avec /stop)."""
+    runner = r or globals()["runner"]                     # le lanceur de CE farm (2 comptes)
     if stopped:
         return
     text = runner.tail(14)
@@ -408,9 +441,9 @@ async def notify(code, stopped):
         mark_sent(d)
 
 
-def on_end(code, stopped):
+def on_end(code, stopped, r=None):
     if LOOP:
-        asyncio.run_coroutine_threadsafe(notify(code, stopped), LOOP)
+        asyncio.run_coroutine_threadsafe(notify(code, stopped, r), LOOP)
 
 
 def options_line(refill, watchdog):
@@ -420,7 +453,35 @@ def options_line(refill, watchdog):
     return f"🔋 Recharge stamina : **{'oui' if r else 'non'}**\n🛡️ Chien de garde : **{'oui' if w else 'non'}**"
 
 
-async def start_script(interaction, command, label, replace, kind="supply", details="", refill=None, watchdog=None):
+SCRIPT_OF = {"auto_supply": "supply", "auto_nightops": "nightops", "auto_hero_trial": "herotrial", "auto_whm": "whm",
+             "auto_aa": "aa", "enchainer": "enchainement", "auto_story_mha": "histoire"}
+
+
+def script_of(command):
+    """Nom du mode d'une commande de lancement (pour la regle « pas 2 fois le meme script »)."""
+    for c in command:
+        stem = Path(str(c)).stem
+        if stem in SCRIPT_OF:
+            return SCRIPT_OF[stem], [str(x) for x in command[command.index(c) + 1:]]
+    return None, []
+
+
+async def start_script(interaction, command, label, replace, kind="supply", details="", refill=None, watchdog=None,
+                       device=None, relance=False):
+    runner = runner_for(device)
+    if relance:                                           # /relancer : ferme et relance le jeu, menu principal, puis le farm
+        command = [sys.executable, "-u", str(BASE / "relancer.py")] + (["--", *command] if command else ["--no-farm"])
+        label = "🔄 Relance du jeu" + (f" → {label}" if label else "")
+        replace = True                                    # le farm fige de CETTE instance est arrete
+    script, args = script_of(command)
+    clash = await asyncio.to_thread(encours.conflict, script, device, args) if script else None
+    if clash and clash[1] != "instance occupée":           # meme script sur l'autre compte : jamais
+        import instances
+        e = embed("⛔ Même script sur l'autre instance", f"{clash[1]} : {encours.describe(clash[0])}\n"
+                  "Deux comptes peuvent farmer en même temps, mais pas le même script.", COLORS["bad"],
+                  tip="Choisis un autre mode, ou /stop d'abord.")
+        await interaction.followup.send(embed=e)
+        return
     if runner.running:
         if not replace:
             e = embed("⏳ Un script tourne déjà", f"{runner.emoji} **{runner.label}**\nDepuis {runner.elapsed()}.",
@@ -429,22 +490,27 @@ async def start_script(interaction, command, label, replace, kind="supply", deta
             return
         runner.stop()
         await asyncio.sleep(2)
-    elif (ext := await asyncio.to_thread(encours.read)):
+    elif (ext := await asyncio.to_thread(encours.read, device)) or (not device and clash and clash[0]):
+        ext = ext or clash[0]
         if not replace:
             e = embed("⏳ Un farm tourne déjà", encours.describe(ext), COLORS["bad"],
                       tip="Relance avec remplacer: Oui pour l'arrêter et lancer celui-ci, ou /stop d'abord.")
             await interaction.followup.send(embed=e)
             return
-        await asyncio.to_thread(encours.stop)
+        await asyncio.to_thread(encours.stop, device, ext)
         await asyncio.sleep(2)
-    dev = await asyncio.to_thread(emulator_state)
+    if device:
+        import instances
+        dev = device if device in await asyncio.to_thread(instances.devices) else None
+    else:
+        dev = await asyncio.to_thread(emulator_state)
     if not dev:
         e = embed("📵 L'émulateur ne répond pas",
                   "Ouvre MuMu avec le jeu lancé sur le PC, puis réessaie.", COLORS["bad"],
                   tip="Si MuMu est bien ouvert : vérifie l'ADB dans l'assistant (bouton Tester).")
         await interaction.followup.send(embed=e)
         return
-    runner.start(command, label, on_end, MODE_EMOJI.get(kind, "🎮"))
+    runner.start(command, label, lambda c, s, r=runner: on_end(c, s, r), MODE_EMOJI.get(kind, "🎮"), device)
     discord_ui.remember(command, label, kind, details)                # pour 🔁 Relancer pareil
     e = embed(f"{MODE_EMOJI.get(kind, '🎮')} C'est parti : {label}", details, COLORS.get(kind, COLORS["info"]),
               tip="Je t'écris en privé quand c'est fini · /statut · /capture · /stop")
@@ -476,7 +542,7 @@ async def on_ready():
 
 
 # ---------------------------------------------------------------- preparation d'un lancement
-async def run_mode(interaction, st, kind, details, remplacer, refill, watchdog):
+async def run_mode(interaction, st, kind, details, remplacer, refill, watchdog, device=None, relance=False):
     try:
         st = ec.validate(st)
     except SystemExit as e:
@@ -489,7 +555,7 @@ async def run_mode(interaction, st, kind, details, remplacer, refill, watchdog):
     ec.REFILL, ec.WATCHDOG = refill, watchdog                 # None = on garde le reglage enregistre (/reglages)
     command = ec.command(st)
     ec.REFILL = ec.WATCHDOG = None
-    await start_script(interaction, command, ec.label(st), remplacer, kind, details, refill, watchdog)
+    await start_script(interaction, command, ec.label(st), remplacer, kind, details, refill, watchdog, device, relance)
 
 
 # ---------------------------------------------------------------- /supply
@@ -790,6 +856,15 @@ async def resume_cmd(interaction: discord.Interaction, heure: str = None, desact
     await discord_ui.resume_command(interaction, heure, desactiver, maintenant)
 
 
+@cmd(name="relancer", description="🔄 Relance le jeu (ferme, relance, menu principal) puis rejoue un farm")
+@app_commands.describe(farm="Que rejouer après la relance du jeu")
+@app_commands.choices(farm=[app_commands.Choice(name="🔁 Le farm en cours (ou le dernier lancé)", value="dernier"),
+                            app_commands.Choice(name="🏠 Rien : juste remettre le jeu au menu", value="aucun"),
+                            app_commands.Choice(name="🎮 Choisir avec les menus", value="choisir")])
+async def relancer_cmd(interaction: discord.Interaction, farm: str = "dernier"):
+    await discord_ui.relancer_flow(interaction, farm)
+
+
 @cmd(name="panneau", description="🎮 Tableau de bord en direct : farm en cours, progression, boutons Stop / Capture")
 async def panneau_cmd(interaction: discord.Interaction):
     await discord_ui.open_panel(interaction)
@@ -806,6 +881,17 @@ async def statut_cmd(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=EPH)
     dev = await asyncio.to_thread(emulator_state)
     emu = f"{'🟢' if dev else '🔴'} Émulateur : **{dev or 'éteint / introuvable'}**\n🖥️ PC : **{socket.gethostname()}**"
+    farms = await asyncio.to_thread(encours.read_all)
+    if len(farms) >= 2:                                   # 2 comptes : un bloc par farm
+        e = embed(f"⏳ {len(farms)} farms en cours", "", COLORS["info"], tip="/capture pour voir les écrans · /stop pour arrêter")
+        for f in farms:
+            bar = discord_ui.bar(f["done"], f["total"]) if f.get("total") else ""
+            tail = "\n".join(encours.tail(f, 3))[-300:].replace("`", "'")
+            e.add_field(name=f.get("label", "?")[:250], value=(encours.describe(f) + (f"\n{bar}" if bar else "")
+                        + (f"\n```\n{tail}\n```" if tail else ""))[:1024], inline=False)
+        e.add_field(name="Machine", value=emu, inline=False)
+        await interaction.followup.send(embed=e)
+        return
     if runner.running:
         p = runner.progress()
         bar = ""
@@ -973,7 +1059,7 @@ async def aide_cmd(interaction: discord.Interaction):
 discord_ui.setup(sys.modules[__name__])                # l'interface recoit CE module (pas une 2e copie)
 
 import maj_cmd
-maj_cmd.setup(cmd, embed, runner, BASE, EPH, COLORS, NO_WINDOW, ENV, discord, app_commands)
+maj_cmd.setup(cmd, embed, AnyRunner(), BASE, EPH, COLORS, NO_WINDOW, ENV, discord, app_commands)
 
 if __name__ == "__main__":
     try:

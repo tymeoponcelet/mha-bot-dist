@@ -1,6 +1,6 @@
 {
- "version": "2026.11.16-000631",
- "message": "",
+ "version": "2026.11.16-191239",
+ "message": "double emu",
  "files": {
   "GUIDE_AMI.txt": {
    "sha256": "263776b406438b0552f00c1214756ab1873b253a6aa6ceff18ab9c333baaaab1",
@@ -19,20 +19,20 @@
    "size": 4846
   },
   "auto_aa.py": {
-   "sha256": "0395cdb19ba436719c03429d5fa05171f64e7a8fb0e59041f75f7c1bdb3723f4",
-   "size": 42349
+   "sha256": "edd8e6781346a1858bd1af149889bb8725ead1185d0065a9d843cb86a91f69f1",
+   "size": 43206
   },
   "auto_hero_trial.py": {
-   "sha256": "670816924b9789bd28564719b5a12099b019ff22c052d2c0b76d7d41d05c8032",
-   "size": 32936
+   "sha256": "962d5b8a9610c28ca7da6b4472c541f66ca234d0f760007375af826d2cfd7818",
+   "size": 34145
   },
   "auto_nightops.py": {
-   "sha256": "c90671d23b02bf0ce74148a611e5bb4bf3fcddad0bfef3719e7725aa6a3e720a",
-   "size": 21532
+   "sha256": "a437f81cfef19da1b28f1ae94af2300470e0cf7d060d8860917ce75f96719684",
+   "size": 22741
   },
   "auto_story_mha.py": {
-   "sha256": "eeea6076a0193f9a80522d9167228a437a0cdb9a8169693085e322de1849fc45",
-   "size": 6985
+   "sha256": "5138d209e07fe91c6f11831e64df42639a1068a902f88b0c89bd013b6bea0cc0",
+   "size": 7146
   },
   "auto_supply.py": {
    "sha256": "292e05ff6e32f17d9e701e868c5d504e0d442d58d29a00c03fbf7b04d6f42919",
@@ -71,28 +71,28 @@
    "size": 5833
   },
   "discord_bot.py": {
-   "sha256": "a84d8e8b1dd1be44a7e58a9816e0faad103223378188f0e4d8cbfae9bb066339",
-   "size": 54194
+   "sha256": "1eb1f18895759a4b2c6952b78fdb0077115aa36e8ded181a634eddb51d3fa836",
+   "size": 58814
   },
   "discord_config.example.json": {
    "sha256": "53f945026eb4ae84eeb29e070857dc392ab67408a2316568e3518781938e6e89",
    "size": 226
   },
   "discord_ui.py": {
-   "sha256": "66968a44b32bace87ac606fa0eefce52408fab663906adbdf25331fd7c4a2ac0",
-   "size": 39447
+   "sha256": "781204f403346d7a1d08f5ff43b70a3bb36b4732878dd2a20bf6b3508d8b62d9",
+   "size": 48869
   },
   "emulateur.py": {
-   "sha256": "f438ba36228a8f044ceea9f30acf4688c026b068fbffa9fb77b21e0ee3856c55",
-   "size": 6201
+   "sha256": "afa402fe45908a45db6a1ff10a134e786db24314b4a20def381484ecb88856e4",
+   "size": 6969
   },
   "enchainer.py": {
    "sha256": "4fad3136aebbae0c3052e116c9ccfb259085005d1a8ba91f17eafde82d61b253",
    "size": 14550
   },
   "encours.py": {
-   "sha256": "3ec3de9507b1a86680de1f551d575c6d260e10a3846290f8afeaa784f6f371ee",
-   "size": 6261
+   "sha256": "41a769fa7b1080f13fcdae898961caf327efdea98810381aa831323e1f07d351",
+   "size": 10432
   },
   "fastmatch.py": {
    "sha256": "30599d717490341fe54d53308b1a79e83e892f13bc00d7d6258f2b2c410543f1",
@@ -106,9 +106,13 @@
    "sha256": "c27a4c4f7e7295ce72543b7e4d7e3e20c6b6461314bc1af92ac5ebe77dbd2a1c",
    "size": 10068
   },
+  "instances.py": {
+   "sha256": "6aa887e9e48112a99d457a30d9f28500fc442ef9e9f919685aab0a0f4e3335b2",
+   "size": 3710
+  },
   "journal.py": {
-   "sha256": "2d139a8f58901b9f584ba2111911d38cdeede7c1ab069eb56e2211640d37f0e0",
-   "size": 11939
+   "sha256": "b3e5caf1e4be16ca0da93dc4188a6d3540a9a60b440c7c0a3196cc2ce8657eea",
+   "size": 12817
   },
   "lancer_assistant.bat": {
    "sha256": "29a4bd19b4cd45453954cd7e8d164f4d3a76c8514b5b2452c1b62de5f0bc6a2b",
@@ -150,6 +154,10 @@
    "sha256": "b84a72e49309325438211e445ea95df3f0596881350b45891aec5f73f41003ce",
    "size": 19407
   },
+  "relancer.py": {
+   "sha256": "74c7e356b6c67740eb58b16bf95cb69c4a972a2f8feb04c72f0f16c422a3570e",
+   "size": 2494
+  },
   "requirements.txt": {
    "sha256": "c7af4b65cf9bdcc9f34344377b96fdad20647f10b0210413d299ef00f01337de",
    "size": 31
@@ -163,12 +171,12 @@
    "size": 199
   },
   "setup_assistant.py": {
-   "sha256": "a75ca8c0a7ae0f1e9957a774142e44b6832955cd3ce2a6284a64291631198822",
-   "size": 112643
+   "sha256": "1303b49ff1fd1a70697442b7e2dc6c25c98676a4c8fa127ad7612cb72ceb66ba",
+   "size": 119086
   },
   "stats.py": {
-   "sha256": "96c9da7cb01c3d76fb17c21c6db2550faab7fc229c21f84d2683f3fb0ed79109",
-   "size": 7023
+   "sha256": "c85349fb8084bdec5e243f6b8c345c2cd3092edaeaf88b57fc5c40953ea9531e",
+   "size": 7037
   },
   "templates/abandonno.png": {
    "sha256": "bb04a1190655e5bf2992df0a2d7d8a0de672df7d11d205f26fd7a673bd550365",

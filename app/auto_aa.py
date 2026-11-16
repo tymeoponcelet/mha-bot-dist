@@ -479,8 +479,10 @@ def pick_char(floor=None):
         debug_shot("menu_persos", s0)
     seen = False
     # Le menu se parcourt en balayant de gauche a droite : on le parcourt EN ENTIER, dans les deux sens, avant de conclure.
-    # Haut floor : d'abord les reserves (tout le menu), ensuite seulement n'importe qui. Bas floor : jamais les reserves.
-    modes = ("reserve", "tous") if high else ("libre",)
+    # Haut floor : UNIQUEMENT les reserves (tout le menu) ; aucun jouable -> arret + alerte (jamais un autre perso).
+    # Bas floor : jamais les reserves.
+    modes = ("reserve",) if high else ("libre",)
+    res_seen = {}                                           # reserves reconnus dans le menu -> meilleure stamina vue
     direction = 1                                           # 1 = vers la suite du menu (doigt de droite a gauche), -1 = retour
     for mode in modes:
         ends = 0                                            # bouts du menu atteints pendant ce passage
@@ -490,9 +492,11 @@ def pick_char(floor=None):
             seen = seen or bool(bars)
             cands = []
             for x, y, v in bars:
+                who = char_under(s, x, y) if CH else None
+                if who:
+                    res_seen[who] = max(res_seen.get(who, -1), v)
                 if v <= 0:
                     continue
-                who = char_under(s, x, y) if CH else None
                 if (mode == "reserve" and not who) or (mode == "libre" and who):
                     continue
                 cands.append((-v, x, y, who))
@@ -523,7 +527,16 @@ def pick_char(floor=None):
                 if ends >= 2:
                     break                                   # les deux bouts ont ete vus : tout le menu a ete regarde
     close_settings()
-    if CH and not high:
+    if high:
+        detail = ", ".join(f"{n} {v}/2" for n, v in sorted(res_seen.items())) or "aucun reconnu dans le menu"
+        missing = [n for n in CH if n not in res_seen]
+        if missing and res_seen:
+            detail += " ; non reconnu(s) : " + ", ".join(missing)
+        debug_shot("reserves_injouables", nt.screenshot())
+        raise Done(f"Floor {floor} : aucun perso reserve jouable ({detail}). Reserves : {', '.join(CH)}. "
+                   f"Arret pour ne PAS jouer un autre perso au floor {RESERVE_FLOOR}+ : recharge leur stamina, "
+                   f"change la liste des reserves ou le floor, puis relance.")
+    if CH:
         log(f"(!) il ne reste que les persos reserves ({', '.join(CH)}) : je les garde pour les floors {RESERVE_FLOOR}+")
     return False
 

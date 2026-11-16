@@ -16,7 +16,7 @@ BASE = Path(__file__).resolve().parent
 FILE = BASE / "logs" / "runs.jsonl"
 MAX_LINES = 20000                          # au-dela, on garde les plus recentes
 SKIP_ARGS = ("--test", "--list", "--swipe", "--capture", "--dry")
-NOT_STATS = {"enchainement"}               # ses etapes sont comptees une par une
+NOT_STATS = {"enchainement", "relance"}    # leurs etapes / le farm relance sont comptes a part
 PROGRESS = [re.compile(r"\|\s*(?:multi-)?run (\d+)/(\d+)"), re.compile(r"\bcombat (\d+)/(\d+)")]
 COUNTERS = {"recharges": "=== RECHARGE DE STAMINA", "relances": "=== WATCHDOG :", "reprises": "=== ECRAN INCONNU",
             "adb": "=== ADB / EMULATEUR : ne repond", "incidents": "(!) incident enregistre"}

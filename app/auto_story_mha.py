@@ -20,6 +20,7 @@ Dossier templates/ (captures recadrées, même résolution que l'émulateur) :
 import json
 import shutil
 import subprocess
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)   # adb sans fenetre, meme lance sans console (pythonw)
 import time
 from pathlib import Path
 
@@ -58,7 +59,7 @@ ADB = _resolve_adb(ADB)
 
 if DEVICE is None:
     # Aucun appareil configuré : on prend le premier appareil détecté par adb
-    _out = subprocess.run([ADB, "devices"], capture_output=True, text=True).stdout.splitlines()[1:]
+    _out = subprocess.run([ADB, "devices"], capture_output=True, creationflags=NO_WINDOW, text=True).stdout.splitlines()[1:]
     _devs = [l.split()[0] for l in _out if l.strip().endswith("device")]
     if not _devs:
         raise SystemExit("Aucun émulateur détecté. Lance-le (jeu ouvert) puis refais 'adb devices'.")
@@ -88,7 +89,7 @@ CLICK_BURST = 5          # nombre de taps par rafale
 
 def adb(*args, binary=False):
     cmd = [ADB] + (["-s", DEVICE] if DEVICE else []) + list(args)
-    out = subprocess.run(cmd, capture_output=True, check=True).stdout
+    out = subprocess.run(cmd, capture_output=True, creationflags=NO_WINDOW, check=True).stdout
     return out if binary else out.decode(errors="ignore")
 
 

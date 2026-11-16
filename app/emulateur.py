@@ -28,7 +28,7 @@ MANAGER_CANDIDATES = [
     r"D:\Program Files\Netease\MuMuPlayer\nx_main\MuMuManager.exe",
     r"D:\Program Files\Netease\MuMuPlayer-12.0\shell\MuMuManager.exe",
 ]
-_state = {"index": None, "times": []}
+_state = {"index": None, "times": [], "several": False}
 
 
 def _run(args, timeout=30):
@@ -80,10 +80,19 @@ def instances(mgr=None):
     return {k: v for k, v in data.items() if isinstance(v, dict)}
 
 
-def remember():
-    """Au demarrage du bot : memorise l'instance MuMu demarree (celle qu'on relancera si besoin)."""
+def remember(device=None):
+    """Au demarrage du bot : memorise l'instance MuMu a relancer si besoin.
+    device '127.0.0.1:<port>' (2 comptes) -> l'instance qui a ce port ; sinon la seule instance demarree."""
     try:
-        started = [k for k, v in instances().items() if v.get("is_android_started")]
+        inst = instances()
+        _state["several"] = sum(1 for v in inst.values() if v.get("is_android_started")) > 1
+        if device and ":" in str(device):
+            port = str(device).rsplit(":", 1)[1]
+            for k, v in inst.items():
+                if str(v.get("adb_port")) == port:
+                    _state["index"] = k
+                    return k
+        started = [k for k, v in inst.items() if v.get("is_android_started")]
         if len(started) == 1:
             _state["index"] = started[0]
     except Exception:                      # noqa: BLE001
@@ -119,9 +128,13 @@ def recover(adb, find_device, log, why=""):
     _state["times"].append(now)
     journal.incident(f"ADB / émulateur ne répond plus ({why[:200]}) : tentative de reprise automatique",
                      live=True, kind="adb")
-    log("=== ADB / EMULATEUR : ne repond plus -> relance du serveur ADB ===")
-    _run([adb, "kill-server"], timeout=20)
-    _run([adb, "start-server"], timeout=30)
+    if _state.get("several"):              # 2 comptes : relancer le serveur ADB couperait l'AUTRE farm -> simple reconnexion
+        log("=== ADB / EMULATEUR : ne repond plus -> reconnexion de cette instance ===")
+        _run([adb, "reconnect", "offline"], timeout=20)
+    else:
+        log("=== ADB / EMULATEUR : ne repond plus -> relance du serveur ADB ===")
+        _run([adb, "kill-server"], timeout=20)
+        _run([adb, "start-server"], timeout=30)
     dev = _device_ok(adb, find_device)
     if not dev:
         mgr = manager()

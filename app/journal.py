@@ -126,8 +126,14 @@ def start(script):
             import encours                      # farm en cours partage (assistant / Discord / planning)
             encours.declare(script, _label(script), _state["path"])
             _state["encours"] = encours
-        except Exception:                       # noqa: BLE001
-            pass
+        except Exception as e:                  # noqa: BLE001
+            if type(e).__name__ == "Occupied":   # un autre farm joue deja sur ce jeu : surtout ne pas jouer en double
+                msg = (f"(!) Instance deja occupee par un autre farm ({e}, pid {e.rec.get('pid')}) : "
+                       "arret pour ne pas jouer deux farms sur le meme jeu. Arrete l'autre farm, puis relance.")
+                print(msg, flush=True)
+                if _state.get("file"):
+                    _state["file"].write(msg + "\n")
+                raise SystemExit(3)
     sys.stdout = _Tee(sys.stdout)
     sys.stderr = _Tee(sys.stderr)
     return _state["path"]
@@ -137,6 +143,17 @@ def _label(script):
     """Nom lisible du farm qui demarre (pour l'assistant et Discord)."""
     import stats
     args = sys.argv[1:]
+    if script == "relance":                     # relance du jeu -> le farm rejoue
+        import encours
+        child, cargs = encours.child_of(args)
+        if not child:
+            return "Relance du jeu"
+        saved = sys.argv
+        try:
+            sys.argv = [saved[0]] + cargs
+            return "Relance du jeu → " + _label(child)
+        finally:
+            sys.argv = saved
     if script != "enchainement":
         return stats.label(script, args)
     try:

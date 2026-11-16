@@ -30,6 +30,7 @@ Dossier templates_hero/ (captures a la MEME resolution que l'emulateur) :
 import json
 import shutil
 import subprocess
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)   # adb sans fenetre, meme lance sans console (pythonw)
 import sys
 import time
 from pathlib import Path
@@ -40,6 +41,7 @@ import numpy as np
 
 import emulateur
 import fastmatch
+import instances
 import heroes
 import journal
 import nav
@@ -148,18 +150,28 @@ def _resolve_adb(path):
 
 
 def _devices():
-    out = subprocess.run([ADB, "devices"], capture_output=True, text=True).stdout.splitlines()[1:]
+    out = subprocess.run([ADB, "devices"], capture_output=True, creationflags=NO_WINDOW, text=True).stdout.splitlines()[1:]
     return [l.split()[0] for l in out if l.strip().endswith("device")]
 
 
 def init_adb():
     global ADB, DEVICE
     ADB = _resolve_adb(ADB)
+    want = instances.wanted()          # instance imposee (2 comptes) : celle-la et aucune autre
+    if want:
+        DEVICE = want
+        if want not in _devices():
+            subprocess.run([ADB, "connect", want], capture_output=True, creationflags=NO_WINDOW, timeout=8)
+        if want not in _devices():
+            raise SystemExit(f"Instance {instances.label(want)} introuvable ({want}) : demarre-la dans MuMu, puis relance.")
+        print(f"ADB : {ADB} | instance : {instances.label(want)} ({want})")
+        emulateur.remember(want)
+        return
     devs = _devices()
     if not devs:                      # l'emulateur n'est pas connecte : on tente les ports connus
         for p in PORTS:
             try:
-                subprocess.run([ADB, "connect", p], capture_output=True, timeout=6)
+                subprocess.run([ADB, "connect", p], capture_output=True, creationflags=NO_WINDOW, timeout=6)
             except Exception:
                 pass
         devs = _devices()
@@ -177,15 +189,24 @@ def _find_device():
     """Pour la reprise (emulateur.py) : appareil visible par ADB (ports connus compris), ou None."""
     def devs():
         try:
-            out = subprocess.run([ADB, "devices"], capture_output=True, text=True, timeout=15).stdout.splitlines()[1:]
+            out = subprocess.run([ADB, "devices"], capture_output=True, creationflags=NO_WINDOW, text=True, timeout=15).stdout.splitlines()[1:]
         except Exception:
             return []
         return [l.split()[0] for l in out if l.strip().endswith("device")]
     d = devs()
+    want = instances.wanted()
+    if want:                           # instance imposee : on la reconnecte, jamais une autre
+        if want not in d:
+            try:
+                subprocess.run([ADB, "connect", want], capture_output=True, creationflags=NO_WINDOW, timeout=8)
+            except Exception:
+                pass
+            d = devs()
+        return want if want in d else None
     if not d:
         for p in PORTS:
             try:
-                subprocess.run([ADB, "connect", p], capture_output=True, timeout=6)
+                subprocess.run([ADB, "connect", p], capture_output=True, creationflags=NO_WINDOW, timeout=6)
             except Exception:
                 pass
         d = devs()
@@ -193,7 +214,7 @@ def _find_device():
 
 
 def adb(*args, binary=False, timeout=30):
-    r = subprocess.run([ADB, "-s", DEVICE, *args], capture_output=True, timeout=timeout)
+    r = subprocess.run([ADB, "-s", DEVICE, *args], capture_output=True, creationflags=NO_WINDOW, timeout=timeout)
     if r.returncode != 0:
         raise RuntimeError(r.stderr.decode(errors="ignore").strip() or "erreur adb")
     return r.stdout if binary else r.stdout.decode(errors="ignore")

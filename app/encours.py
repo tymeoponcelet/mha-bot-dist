@@ -60,22 +60,92 @@ def alive(rec):
 
 
 # ---------------------------------------------------------------- ecriture (le script qui tourne)
-def _write(rec):
+def file_for(device=None):
+    """Un fichier par instance (2 comptes) ; sans instance imposee : l'ancien fichier unique."""
+    if not device:
+        return FILE
+    safe = "".join(c if c.isalnum() else "-" for c in str(device))
+    return FILE.with_name(f"en_cours_{safe}.json")
+
+
+SCRIPT_FILES = {"supply": "auto_supply.py", "nightops": "auto_nightops.py", "herotrial": "auto_hero_trial.py",
+                "whm": "auto_whm.py", "aa": "auto_aa.py", "enchainement": "enchainer.py", "histoire": "auto_story_mha.py"}
+STEMS = {Path(v).stem: k for k, v in SCRIPT_FILES.items()}
+
+
+def child_of(args):
+    """Relance : le farm rejoue apres « -- » -> (script, args) ou (None, [])."""
+    args = list(args)
+    if "--" not in args:
+        return None, []
+    rest = args[args.index("--") + 1:]
+    for i, a in enumerate(rest):
+        stem = Path(str(a)).stem
+        if stem in STEMS:
+            return STEMS[stem], [str(x) for x in rest[i + 1:]]
+    return None, []
+
+
+def command_of(rec):
+    """Commande exacte pour relancer le farm `rec` (memes options), ou None."""
+    script, args = rec.get("script"), list(rec.get("args") or [])
+    if script == "relance":
+        script, args = child_of(args)
+    if script not in SCRIPT_FILES:
+        return None
+    return [sys.executable, "-u", str(BASE / SCRIPT_FILES[script])] + args
+
+
+def modes_of(script, args):
+    """Modes que ce farm occupe : {'supply'} ; un enchainement -> les modes de ses etapes ; une relance -> son farm."""
+    if script == "relance":
+        child, cargs = child_of(args)
+        return modes_of(child, cargs) if child else ["relance"]
+    if script != "enchainement":
+        return [script]
+    out = []
     try:
-        FILE.parent.mkdir(parents=True, exist_ok=True)
-        tmp = FILE.with_suffix(f".{os.getpid()}.tmp")
+        import enchainer as ec
+        for t in args:
+            if not t.startswith("--"):
+                m = ec.parse_token(t)["mode"]
+                m = {"hero": "herotrial"}.get(m, m)
+                if m not in out:
+                    out.append(m)
+    except BaseException:                                # noqa: BLE001
+        pass
+    return out or [script]
+
+
+def _write(rec):
+    f = file_for(rec.get("device"))
+    try:
+        f.parent.mkdir(parents=True, exist_ok=True)
+        tmp = f.with_suffix(f".{os.getpid()}.tmp")
         tmp.write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(FILE)
+        tmp.replace(f)
         _me["t"] = time.time()
     except OSError:
         pass
 
 
+class Occupied(Exception):
+    """Un autre farm VIVANT est deja inscrit sur cette instance : on ne l'ecrase pas (deux farms sur un meme jeu)."""
+
+    def __init__(self, rec):
+        super().__init__(rec.get("label", "?"))
+        self.rec = rec
+
+
 def declare(script, label, log=None):
     pid = os.getpid()
+    other = _read_file(file_for(os.environ.get("MHA_DEVICE") or None))
+    if other and other.get("pid") != pid:
+        raise Occupied(other)
     rec = {"pid": pid, "pstart": _creation_time(pid) or time.time(), "script": script, "label": label,
            "source": os.environ.get("MHA_SOURCE") or "manuel", "t0": time.time(), "done": None, "total": None,
-           "step": None, "last": "", "log": str(log or ""), "args": sys.argv[1:]}      # options reelles (--refill...)
+           "step": None, "last": "", "log": str(log or ""), "args": sys.argv[1:],     # options reelles (--refill...)
+           "device": os.environ.get("MHA_DEVICE") or None, "modes": modes_of(script, sys.argv[1:])}
     _me["rec"] = rec
     _write(rec)
     import atexit
@@ -107,33 +177,65 @@ def clear():
     """Fin du script : on s'efface (seulement si c'est bien nous qui sommes inscrits)."""
     rec = _me["rec"]
     _me["rec"] = None
+    if not rec:
+        return
+    f = file_for(rec.get("device"))
     try:
-        cur = json.loads(FILE.read_text(encoding="utf-8"))
-        if rec and cur.get("pid") == rec["pid"]:
-            FILE.unlink()
+        cur = json.loads(f.read_text(encoding="utf-8"))
+        if cur.get("pid") == rec["pid"]:
+            f.unlink()
     except (OSError, ValueError):
         pass
 
 
 # ---------------------------------------------------------------- lecture / arret (assistant, Discord)
-def read():
-    """-> le farm en cours (dict) ou None."""
+def _read_file(f):
     try:
-        rec = json.loads(FILE.read_text(encoding="utf-8"))
+        rec = json.loads(f.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     if not alive(rec):
         try:
-            FILE.unlink()                                # reste d'un script tue sans pouvoir s'effacer
+            f.unlink()                                   # reste d'un script tue sans pouvoir s'effacer
         except OSError:
             pass
         return None
+    rec["_file"] = str(f)
     return rec
 
 
-def stop():
-    """Arrete le farm en cours (avec ses scripts enfants). -> le farm arrete (dict) ou None."""
-    rec = read()
+def read_all():
+    """-> tous les farms en cours (toutes instances), du plus ancien au plus recent."""
+    files = [FILE] + sorted(FILE.parent.glob("en_cours_*.json")) if FILE.parent.exists() else []
+    recs = [r for r in (_read_file(f) for f in files) if r]
+    return sorted(recs, key=lambda r: r.get("t0", 0))
+
+
+def read(device=None):
+    """-> le farm en cours sur cette instance (device) ; sans device : le premier farm en cours. None sinon."""
+    if device:
+        return _read_file(file_for(device))
+    recs = read_all()
+    return recs[0] if recs else None
+
+
+def conflict(script, device=None, args=()):
+    """Ce qui empeche de lancer `script` sur `device` : (farm, raison) ou None.
+    Une instance = un farm a la fois ; et jamais le MEME script sur deux instances en meme temps."""
+    want = set(modes_of(script, list(args)))
+    for rec in read_all():
+        if (rec.get("device") or None) == (device or None):
+            return rec, "instance occupée"
+        common = want & set(rec.get("modes") or [rec.get("script")])
+        if common:
+            return rec, f"{', '.join(sorted(common))} tourne déjà sur l'autre instance"
+    return None
+
+
+def stop(device=None, rec=None):
+    """Arrete le farm en cours (avec ses scripts enfants) : celui de `device`, ou `rec`, ou le premier.
+    -> le farm arrete (dict) ou None."""
+    rec = rec or read(device)
     if not rec:
         return None
     subprocess.run(["taskkill", "/PID", str(rec["pid"]), "/T", "/F"], capture_output=True, creationflags=NO_WINDOW)
@@ -142,7 +244,7 @@ def stop():
             break
         time.sleep(0.25)
     try:
-        FILE.unlink()
+        Path(rec.get("_file") or file_for(rec.get("device"))).unlink()
     except OSError:
         pass
     return rec
@@ -167,4 +269,10 @@ def describe(rec):
         bits.append(f"run {rec['done']}/{rec['total']}")
     bits.append(f"{el // 3600}h{el % 3600 // 60:02d}" if el >= 3600 else f"{el // 60} min")
     bits.append("lancé depuis " + SOURCES.get(rec.get("source"), rec.get("source", "?")))
+    if rec.get("device"):
+        try:
+            import instances
+            bits.append("📱 " + instances.label(rec["device"]))
+        except Exception:                               # noqa: BLE001
+            bits.append("📱 " + rec["device"])
     return " · ".join(bits)

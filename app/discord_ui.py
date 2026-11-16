@@ -52,10 +52,35 @@ def last():
 
 
 # ---------------------------------------------------------------- actions communes (commandes ET boutons)
+def _runner_of(rec):
+    """Le lanceur Discord de ce farm (pour marquer « arrete par toi » : pas de message « arrete avant la fin »)."""
+    for r in B.runners.values():
+        if r.running and (rec is None or r.proc.pid == rec.get("pid")):
+            return r
+    return None
+
+
+async def stop_rec(rec):
+    """Arrete un farm precis. -> libelle."""
+    r = _runner_of(rec)
+    if r:
+        label = r.label
+        r.stop()
+        return label
+    await asyncio.to_thread(B.encours.stop, None, rec)
+    return rec.get("label", "?")
+
+
 async def do_stop(interaction):
-    label, emo = B.runner.label, B.runner.emoji
+    farms = await asyncio.to_thread(B.encours.read_all)
+    if len(farms) >= 2:                                   # 2 comptes : lequel ?
+        await interaction.response.send_message(embed=B.embed("⏹ Quel farm arrêter ?", "\n".join(
+            f"• {B.encours.describe(f)}" for f in farms), B.COLORS["bad"]), view=StopChoice(farms), ephemeral=B.EPH)
+        return
+    alone = _runner_of(farms[0]) if farms else next((r for r in B.runners.values() if r.running), None)
+    label, emo = (alone.label, alone.emoji) if alone else (B.runner.label, B.runner.emoji)
     send = interaction.response.send_message
-    if B.runner.stop():
+    if alone and alone.stop():
         await send(embed=B.embed("⏹ Script arrêté", f"{emo} **{label}**", B.COLORS["bad"],
                                  tip="Le jeu reste où il en est : relance quand tu veux."), ephemeral=B.EPH, view=Actions(["relancer"]))
     elif (ext := await asyncio.to_thread(B.encours.stop)):              # lance depuis l'assistant, le planning...
@@ -88,6 +113,17 @@ def stats_embed(jours=7):
 
 async def do_capture(interaction):
     await interaction.response.defer(ephemeral=B.EPH, thinking=True)
+    import instances
+    items = await asyncio.to_thread(instances.listing)
+    if len(items) >= 2:                                   # 2 comptes : l'ecran de chaque instance
+        files = []
+        for i in items:
+            png = await asyncio.to_thread(B.screenshot_png, i["serial"])
+            if png:
+                files.append(discord.File(io.BytesIO(png), filename=f"capture_mumu{i['index'] or len(files)}.png"))
+        if files:
+            await interaction.followup.send(content=" · ".join(instances.label(i["serial"], items) for i in items), files=files)
+            return
     png = await asyncio.to_thread(B.screenshot_png)
     if not png:
         await interaction.followup.send(embed=B.embed("📵 Capture impossible", "L'émulateur est éteint, ou ADB ne le trouve pas.",
@@ -142,6 +178,73 @@ class Actions(OwnerView):
             else:
                 await BUTTONS[key][2](interaction)
         return cb
+
+
+class StopChoice(OwnerView):
+    """2 farms en cours : un bouton par farm + « Tout arreter »."""
+
+    def __init__(self, farms):
+        super().__init__(timeout=300)
+        import instances
+        items = instances.listing(connect=False)
+        for f in farms[:4]:
+            b = discord.ui.Button(label=f"⏹ {f.get('label', '?')[:40]} · {instances.label(f.get('device'), items)[:30]}",
+                                  style=discord.ButtonStyle.danger)
+            b.callback = self._one(f)
+            self.add_item(b)
+        b = discord.ui.Button(label="⏹ Tout arrêter", style=discord.ButtonStyle.secondary)
+        b.callback = self._all(farms)
+        self.add_item(b)
+
+    @staticmethod
+    def _one(f):
+        async def cb(interaction):
+            label = await stop_rec(f)
+            await interaction.response.send_message(embed=B.embed("⏹ Farm arrêté", f"**{label}**", B.COLORS["bad"]), ephemeral=B.EPH)
+        return cb
+
+    @staticmethod
+    def _all(farms):
+        async def cb(interaction):
+            names = [await stop_rec(f) for f in farms]
+            await interaction.response.send_message(embed=B.embed("⏹ Tout arrêté", "\n".join(f"**{n}**" for n in names),
+                                                                  B.COLORS["bad"]), ephemeral=B.EPH)
+        return cb
+
+
+async def _relance_button(interaction):
+    await relancer_flow(interaction, "dernier")
+
+
+BUTTONS["relancejeu"] = ("🔄 Relancer le jeu", discord.ButtonStyle.primary, _relance_button)
+
+
+async def relancer_flow(interaction, farm="dernier", device=None):
+    """/relancer et bouton 🔄 : quelle instance (si 2), quel farm rejouer, puis relancer.py."""
+    import instances
+    items = await asyncio.to_thread(instances.listing)
+    if device is None and len(items) >= 2:
+        await interaction.response.send_message(embed=B.embed("🔄 Relancer le jeu sur quelle instance ?", "", B.COLORS["info"]),
+                                                view=RelanceChoice(items, farm), ephemeral=B.EPH)
+        return
+    if farm == "choisir":
+        v = FarmView(relance=True, device=device)
+        await interaction.response.send_message(embed=v.embed(), view=v, ephemeral=B.EPH)
+        return
+    rec = await asyncio.to_thread(B.encours.read, device)
+    cmd, label, kind = None, "", "supply"
+    if farm == "dernier":
+        if rec and B.encours.command_of(rec):
+            cmd, label = B.encours.command_of(rec), rec.get("label", "")
+            label = label.split("→", 1)[-1].strip() if label.startswith("Relance") else label
+        elif (lt := last()) and not device:
+            cmd, label, kind = lt["command"], lt["label"], lt.get("kind", "supply")
+    if cmd:
+        script, _a = B.script_of(cmd)
+        kind = {"herotrial": "hero", "enchainement": "chain"}.get(script, script or kind)
+    await interaction.response.defer(ephemeral=B.EPH, thinking=True)
+    await B.start_script(interaction, cmd or [], label, True, kind, "Fermeture du jeu, relance, retour au menu principal"
+                         + (", puis le farm." if cmd else " (aucun farm à rejouer)."), device=device, relance=True)
 
 
 def register(client):
@@ -207,13 +310,16 @@ def panel_embed():
     """Contenu du tableau de bord (appele dans un fil : lectures disque / ADB)."""
     import socket
     import stats
-    rec = B.encours.read()
+    farms = B.encours.read_all()
+    if len(farms) >= 2:                                   # 2 comptes : un bloc par farm
+        return _panel_multi(farms)
+    rec = farms[0] if farms else None
     dev = B.emulator_state()
     if B.runner.running or rec:
         label = B.runner.label if B.runner.running else rec.get("label", "?")
         p = B.runner.progress() if B.runner.running else ((rec.get("done"), rec.get("total")) if rec.get("total") else None)
         src = "Discord" if B.runner.running else B.encours.SOURCES.get(rec.get("source"), "?")
-        el = B.runner.elapsed() if B.runner.running else B.encours.describe(rec).split(" · ")[-2]
+        el = B.runner.elapsed() if B.runner.running else _elapsed(rec)
         desc = f"⏳ **{label}**\n" + (bar(*p) + "\n" if p and p[1] else "") + \
                (f"🔗 Étape {rec['step']}\n" if rec and rec.get("step") else "") + f"⏱ {el} · lancé depuis {src}"
         last_line = (B.runner.tail(1) if B.runner.running else rec.get("last", ""))[-120:]
@@ -236,6 +342,32 @@ def panel_embed():
     e.add_field(name="Version", value=version.label(B.BASE), inline=True)
     if last_line:
         e.add_field(name="Dernière ligne", value=f"`{last_line.replace('`', chr(39))}`", inline=False)
+    e.set_footer(text="Mis à jour à " + time.strftime("%H:%M:%S") + " · se rafraîchit tout seul")
+    return e
+
+
+def _elapsed(rec):
+    s = int(time.time() - rec.get("t0", time.time()))
+    return f"{s // 3600}h{s % 3600 // 60:02d}" if s >= 3600 else f"{s // 60} min"
+
+
+def _panel_multi(farms):
+    import socket
+    import instances
+    import version
+    items = instances.listing(connect=False)
+    blocks = []
+    for f in farms:
+        r, w = effective_options(f.get("args"))
+        b = bar(f["done"], f["total"]) if f.get("total") else ""
+        blocks.append(f"📱 **{instances.label(f.get('device'), items)}**\n⏳ **{f.get('label', '?')}**"
+                      + (f"\n{b}" if b else "") + (f"\n🔗 Étape {f['step']}" if f.get("step") else "")
+                      + f"\n⏱ {_elapsed(f)} · {B.encours.SOURCES.get(f.get('source'), '?')} · 🔋 {'oui' if r else 'non'} · "
+                        f"🛡️ {'oui' if w else 'non'}")
+    e = discord.Embed(title=f"🎮 MHA Bot — {socket.gethostname()} · {len(farms)} farms", description="\n\n".join(blocks)[:4000],
+                      color=B.COLORS["info"])
+    e.add_field(name="🗓️ Prochain farm programmé", value=_next_planned()[:200], inline=False)
+    e.add_field(name="Version", value=version.label(B.BASE), inline=True)
     e.set_footer(text="Mis à jour à " + time.strftime("%H:%M:%S") + " · se rafraîchit tout seul")
     return e
 
@@ -364,10 +496,11 @@ class FarmView(OwnerView):
     Discord : 5 lignes maxi, un menu par ligne -> Supply regroupe ressource + niveau dans un seul menu."""
     RUNS = [1, 2, 3, 5, 10, 15, 20, 30, 50, 100]
 
-    def __init__(self):
+    def __init__(self, relance=False, device=None):
         super().__init__(timeout=900)
         import enchainer as ec
         self.ec = ec
+        self.relance, self.device = relance, device         # /relancer -> choisir : relance du jeu puis ce farm
         self.key = "supply"
         self.st = dict(ec.MODES_UI["supply"][1])
         self.refill = bool(B.cfg_get("stamina_refill", False))       # reglage enregistre ; ne vaut que pour ce lancement
@@ -384,7 +517,8 @@ class FarmView(OwnerView):
         aa = self.st["mode"] == "aa"
         opts = ("🔋 Recharge : —  (pas en Agency)" if aa else f"🔋 Recharge de stamina : **{'oui' if self.refill else 'non'}**") + \
             f"\n🛡️ Chien de garde : **{'oui' if self.wd else 'non'}**"
-        e = discord.Embed(title=f"🎮 Que veux-tu farmer ?  ·  {title}", description=f"**{desc}**\n\n{opts}",
+        e = discord.Embed(title=("🔄 Relance du jeu, puis : " if self.relance else "🎮 Que veux-tu farmer ?  ·  ") + title,
+                          description=f"**{desc}**\n\n{opts}",
                           color=B.COLORS.get(KIND[self.st["mode"]], B.COLORS["info"]))
         tips = "Choisis dans les menus, puis ▶ Lancer (ou 🗓️ Programmer). 🔋 / 🛡️ : pour ce lancement seulement."
         if aa:
@@ -536,6 +670,20 @@ class FarmView(OwnerView):
         await self.refresh(interaction)
 
     async def launch(self, interaction):
+        import instances
+        if self.device:                                   # instance deja choisie (/relancer)
+            await self.launch_on(interaction, self.device)
+            return
+        items = await asyncio.to_thread(instances.listing)
+        if len(items) >= 2:                               # 2 comptes : sur quelle instance ?
+            v = InstanceChoice(self, items)
+            await interaction.response.send_message(embed=discord.Embed(
+                title="📱 Sur quelle instance ?", description="Une instance occupée, ou qui ferait le même script que l'autre, "
+                "est grisée.", color=B.COLORS["info"]), view=v, ephemeral=B.EPH)
+            return
+        await self.launch_on(interaction, None)
+
+    async def launch_on(self, interaction, device):
         await interaction.response.defer(ephemeral=B.EPH, thinking=True)
         st = dict(self.st)
         try:
@@ -543,11 +691,56 @@ class FarmView(OwnerView):
         except SystemExit:
             details = ""
         refill = None if st["mode"] == "aa" else self.refill
-        await B.run_mode(interaction, st, KIND[st["mode"]], details, False, refill, self.wd)
+        await B.run_mode(interaction, st, KIND[st["mode"]], details, False, refill, self.wd, device, self.relance)
 
     async def program(self, interaction):
         refill = None if self.st["mode"] == "aa" else self.refill             # Agency : pas de recharge de stamina
         await interaction.response.send_modal(PlanModal(dict(self.st), refill, self.wd))
+
+
+SCRIPT_NAME = {"supply": "supply", "nightops": "nightops", "hero": "herotrial", "whm": "whm", "aa": "aa"}
+
+
+class InstanceChoice(OwnerView):
+    """Lancer de /farm avec 2 instances : un bouton par instance (grise si occupee ou meme script ailleurs)."""
+
+    def __init__(self, farm_view, items):
+        super().__init__(timeout=300)
+        import instances
+        script = SCRIPT_NAME[farm_view.st["mode"]]
+        for i in items[:5]:
+            clash = B.encours.conflict(script, i["serial"])
+            b = discord.ui.Button(label=(f"📱 {instances.label(i['serial'], items)}" + (f" — {clash[1]}" if clash else ""))[:80],
+                                  style=discord.ButtonStyle.secondary if clash else discord.ButtonStyle.success,
+                                  disabled=bool(clash))
+            b.callback = self._go(farm_view, i["serial"])
+            self.add_item(b)
+
+    @staticmethod
+    def _go(farm_view, serial):
+        async def cb(interaction):
+            await farm_view.launch_on(interaction, serial)
+        return cb
+
+
+class RelanceChoice(OwnerView):
+    """/relancer avec 2 instances : un bouton par instance (avec ce qui y tourne)."""
+
+    def __init__(self, items, farm):
+        super().__init__(timeout=300)
+        import instances
+        for i in items[:5]:
+            rec = B.encours.read(i["serial"])
+            lab = f"📱 {instances.label(i['serial'], items)}" + (f" — {rec.get('label', '?')}" if rec else "")
+            b = discord.ui.Button(label=lab[:80], style=discord.ButtonStyle.primary)
+            b.callback = self._go(i["serial"], farm)
+            self.add_item(b)
+
+    @staticmethod
+    def _go(serial, farm):
+        async def cb(interaction):
+            await relancer_flow(interaction, farm, serial)
+        return cb
 
 
 async def open_farm(interaction):
@@ -576,7 +769,8 @@ def help_pages():
         ("👀 Pendant le farm", B.COLORS["nightops"], [
             ("Suivre", "**/panneau** — tableau de bord en direct\n**/statut** — où ça en est\n**/capture** — l'écran en photo"),
             ("Agir", "**/stop** — tout arrêter (même un farm lancé depuis l'assistant ou le planning)\n"
-                     "Sur les messages : 🔁 Relancer pareil · 📸 Capture · ⏹ Stop"),
+                     "**/relancer** — jeu figé ? ferme et relance le jeu, menu principal, puis rejoue le farm\n"
+                     "Sur les messages : 🔄 Relancer le jeu · 🔁 Relancer pareil · 📸 Capture · ⏹ Stop"),
             ("Alertes automatiques", "🚨 blocage ou plantage (capture + 30 dernières captures) · 📵 émulateur / ADB "
                                      "(reprise automatique) · 🔄 écran inconnu · 📉 image qui se dégrade"),
         ]),
