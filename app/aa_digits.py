@@ -86,6 +86,20 @@ def by_shape(g):
     return 0, 3                                           # forme inconnue
 
 
+HOLES = {0: 1, 6: 1, 9: 1, 8: 2}                    # trous fermes de chaque chiffre (les autres : aucun)
+
+
+def holes_ok(d, n):
+    """Garde-fou : un chiffre « reconnu » doit avoir le bon nombre de trous (bug du 16/11 : 16 et 18 lus « 10 »,
+    le 6 et le 8 ressemblant au 0 enregistre a 0,87 / 0,91)."""
+    hs = holes(n)
+    if len(hs) != HOLES.get(d, 0):
+        return False
+    if len(hs) == 1:                                  # 0, 6 et 9 : un trou, au milieu / en bas / en haut (comme by_shape)
+        return d == (9 if hs[0] < 0.42 else 6 if hs[0] > 0.58 else 0)
+    return True
+
+
 def known():
     if not _known and DIR.is_dir():
         for f in sorted(DIR.glob("*.png")):
@@ -106,7 +120,7 @@ def read_digit(g):
         iou = float((n & k).sum()) / max(1, int((n | k).sum()))
         if iou > best[1]:
             best = (d, iou)
-    if best[1] >= 0.80:
+    if best[1] >= 0.80 and holes_ok(best[0], n):
         return best[0], "connu", best[1]
     d, miss = by_shape(g)
     return d, "forme", max(0.0, 1 - miss / 3)

@@ -1,6 +1,6 @@
 {
- "version": "2026.11.16-221945",
- "message": "ez",
+ "version": "2026.11.17-003639",
+ "message": "",
  "files": {
   "GUIDE_AMI.txt": {
    "sha256": "263776b406438b0552f00c1214756ab1873b253a6aa6ceff18ab9c333baaaab1",
@@ -15,8 +15,8 @@
    "size": 23940
   },
   "aa_digits.py": {
-   "sha256": "264b52b1b4beb54568c88dbf60f1525659536dab67c40e3a05f13be7f2723591",
-   "size": 5030
+   "sha256": "d1f5b4f6645c07b546b14f3dc937e758f3b789848340755b47bbe55efe042479",
+   "size": 5649
   },
   "auto_aa.py": {
    "sha256": "04797ac8d8fed75c94ee62c2b6506acd5a18edc0e702b26a6afbf3bda56f6c24",
@@ -410,9 +410,21 @@
    "sha256": "72d0cb52ac5b3bab8575f27d52fd66c4123b8d2c09d1349b0a50f6032581184d",
    "size": 164
   },
+  "templates_aa/digits/5.png": {
+   "sha256": "56949079253a87fb2c4b86b6b1db827bf5029429d0b04543697d5f914d9c9152",
+   "size": 152
+  },
+  "templates_aa/digits/6.png": {
+   "sha256": "3501dc4c6cccbde3820141340b863c94f1856b0f3ba76f35acb32cbdf8ddbca0",
+   "size": 155
+  },
   "templates_aa/digits/7.png": {
    "sha256": "538dc4d2d44e53281b8bc721b65573e74f3b97332e0cddbc2defbff48745437e",
    "size": 163
+  },
+  "templates_aa/digits/8.png": {
+   "sha256": "d74fd543648004adb4c8202a0e6497021cbef485160278c6afc1a0e60fdc17a5",
+   "size": 158
   },
   "templates_aa/eijiro.png": {
    "sha256": "fd6859cf8d719695837b970e70754ea05daed50f619ffdb7d45124d3a6eb7299",
