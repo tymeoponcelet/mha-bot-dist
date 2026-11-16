@@ -753,7 +753,7 @@ class App(tk.Tk):
         tk.Label(self.inst_row, text="📱 Instance", bg=CARD, fg=TEXT, font=F(10, True)).pack(side="left")
         self.inst_combo = ttk.Combobox(self.inst_row, width=40, state="readonly")
         self.inst_combo.pack(side="left", padx=(8, 0))
-        tk.Label(self.inst_row, text="(2 comptes : jamais le même script sur les deux)", bg=CARD, fg=MUTED,
+        tk.Label(self.inst_row, text="(2 comptes : un farm par instance, le même mode possible sur les deux)", bg=CARD, fg=MUTED,
                  font=F(8)).pack(side="left", padx=(8, 0))
         self.others_row = tk.Frame(info, bg=CARD)
         self.others_lbl = tk.Label(self.others_row, text="", bg=CARD, fg=YELLOW, font=F(9, True), anchor="w", justify="left")
@@ -1977,10 +1977,6 @@ class App(tk.Tk):
             detached = True                              # 2 comptes : 2e farm sur l'autre instance, suivi par le registre
         if device:
             clash = encours.conflict(self.script_name(), device, self.chain_tokens())
-            if clash and clash[1] != "instance occupée":
-                messagebox.showwarning("Même script sur l'autre instance", f"{clash[1]} :\n{encours.describe(clash[0])}\n\n"
-                                       "Deux comptes peuvent farmer en même temps, mais pas le même script.")
-                return
             ext = clash[0] if clash else None
         else:
             ext = encours.read()

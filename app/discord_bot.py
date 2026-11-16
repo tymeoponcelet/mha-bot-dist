@@ -460,7 +460,7 @@ SCRIPT_OF = {"auto_supply": "supply", "auto_nightops": "nightops", "auto_hero_tr
 
 
 def script_of(command):
-    """Nom du mode d'une commande de lancement (pour la regle « pas 2 fois le meme script »)."""
+    """Nom du mode d'une commande de lancement (registre des farms, instance occupee)."""
     for c in command:
         stem = Path(str(c)).stem
         if stem in SCRIPT_OF:
@@ -477,13 +477,6 @@ async def start_script(interaction, command, label, replace, kind="supply", deta
         replace = True                                    # le farm fige de CETTE instance est arrete
     script, args = script_of(command)
     clash = await asyncio.to_thread(encours.conflict, script, device, args) if script else None
-    if clash and clash[1] != "instance occupée":           # meme script sur l'autre compte : jamais
-        import instances
-        e = embed("⛔ Même script sur l'autre instance", f"{clash[1]} : {encours.describe(clash[0])}\n"
-                  "Deux comptes peuvent farmer en même temps, mais pas le même script.", COLORS["bad"],
-                  tip="Choisis un autre mode, ou /stop d'abord.")
-        await interaction.followup.send(embed=e)
-        return
     if runner.running:
         if not replace:
             e = embed("⏳ Un script tourne déjà", f"{runner.emoji} **{runner.label}**\nDepuis {runner.elapsed()}.",

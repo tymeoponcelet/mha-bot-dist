@@ -690,8 +690,8 @@ class FarmView(OwnerView):
         if len(items) >= 2:                               # 2 comptes : sur quelle instance ?
             v = InstanceChoice(self, items)
             await interaction.response.send_message(embed=discord.Embed(
-                title="📱 Sur quelle instance ?", description="Une instance occupée, ou qui ferait le même script que l'autre, "
-                "est grisée.", color=B.COLORS["info"]), view=v, ephemeral=B.EPH)
+                title="📱 Sur quelle instance ?", description="Une instance occupée est grisée. Le même mode peut tourner "
+                "sur les deux.", color=B.COLORS["info"]), view=v, ephemeral=B.EPH)
             return
         await self.launch_on(interaction, None)
 
@@ -714,7 +714,7 @@ SCRIPT_NAME = {"supply": "supply", "nightops": "nightops", "hero": "herotrial", 
 
 
 class InstanceChoice(OwnerView):
-    """Lancer de /farm avec 2 instances : un bouton par instance (grise si occupee ou meme script ailleurs)."""
+    """Lancer de /farm avec 2 instances : un bouton par instance (grise si occupee)."""
 
     def __init__(self, farm_view, items):
         super().__init__(timeout=300)

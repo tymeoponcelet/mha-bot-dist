@@ -128,7 +128,7 @@ def save():
             hist[k] = (hist.get(k, []) + [round(statistics.median(v), 3)])[-KEEP:]
         try:
             HIST.parent.mkdir(parents=True, exist_ok=True)
-            tmp = HIST.with_suffix(".tmp")
+            tmp = HIST.with_suffix(f".{os.getpid()}.tmp")         # 2 farms en meme temps : chacun son fichier
             tmp.write_text(json.dumps(hist, indent=1, sort_keys=True), encoding="utf-8")
             tmp.replace(HIST)
         except OSError:

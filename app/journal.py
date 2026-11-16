@@ -110,6 +110,10 @@ def start(script):
         else:
             LOG_DIR.mkdir(exist_ok=True)
             path = LOG_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}_{script}.log"
+            n = 2
+            while path.exists():                    # meme script lance la meme seconde (2 instances) : journal a part
+                path = LOG_DIR / f"{time.strftime('%Y%m%d-%H%M%S')}_{script}~{n}.log"
+                n += 1
             _state["file"] = open(path, "a", encoding="utf-8", buffering=1)
             _state["path"] = path
             os.environ[ENV_LOG] = str(path)

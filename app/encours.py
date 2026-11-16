@@ -223,14 +223,10 @@ def read(device=None):
 
 def conflict(script, device=None, args=()):
     """Ce qui empeche de lancer `script` sur `device` : (farm, raison) ou None.
-    Une instance = un farm a la fois ; et jamais le MEME script sur deux instances en meme temps."""
-    want = set(modes_of(script, list(args)))
+    Une instance = un farm a la fois. Le MEME script sur deux instances est permis (demande du 16/11/2026)."""
     for rec in read_all():
         if (rec.get("device") or None) == (device or None):
             return rec, "instance occupée"
-        common = want & set(rec.get("modes") or [rec.get("script")])
-        if common:
-            return rec, f"{', '.join(sorted(common))} tourne déjà sur l'autre instance"
     return None
 
 
