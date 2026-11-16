@@ -14,6 +14,8 @@ on repasse automatiquement en couleur sur toute la capture : jamais de perte de 
 
 Pour revenir a l'ancienne methode (tout en couleur, lent) : lancer le bot avec  --slow-match
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import sys
 from concurrent.futures import ThreadPoolExecutor
 

@@ -17,6 +17,8 @@ Dossier templates/ (captures recadrées, même résolution que l'émulateur) :
     continue.png     -> le texte "Tap to continue"
     close.png        -> la croix rouge en haut à droite de la page de récompenses
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import shutil
 import subprocess

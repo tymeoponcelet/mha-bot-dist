@@ -36,6 +36,8 @@ Config.json : "aa_runs", "aa_bots", "aa_reset_floor", "aa_floor", "aa_cards" (ca
               "aa_char_pos", "aa_icon_dy" (distance en px entre la barre de stamina et l'icone du perso, defaut 95).
 Images : dossier templates_aa/.
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import sys
 import time
@@ -66,6 +68,9 @@ CHAR_POS = None
 DEFAULT_CHAR_POS = (0.205, 0.42)   # ton perso (modele 3D) dans le lobby, en fractions de l'ecran ; "aa_char_pos" le remplace
 RESERVED = []                  # persos gardes pour les hauts floors (images dans templates_aa/chars/<nom>.png)
 RESERVE_FLOOR = 10             # a partir de ce floor on joue les persos reserves ; en dessous on n'y touche pas
+RESERVED2 = []                 # 2e liste : persos gardes pour les TRES hauts floors (UNIQUEMENT eux a partir de RESERVE2_FLOOR)
+RESERVE2_FLOOR = 13
+RESET_FALLBACK = 0             # reset de secours : plus aucun reserve 13+ jouable -> reset des ce floor (0 = arret + alerte)
 ICON_DY = 75                   # distance entre la barre de stamina et le centre de l'icone du perso (menu Battle Settings)
 try:
     _c = json.loads((BASE / "config.json").read_text(encoding="utf-8"))
@@ -78,6 +83,9 @@ try:
     ICON_DY = int(_c.get("aa_icon_dy", ICON_DY) or ICON_DY)
     RESERVED = [str(n).lower() for n in (_c.get("aa_reserved") or [])]
     RESERVE_FLOOR = max(1, int(_c.get("aa_reserve_floor", RESERVE_FLOOR) or RESERVE_FLOOR))
+    RESERVED2 = [str(n).lower() for n in (_c.get("aa_reserved2") or [])]
+    RESERVE2_FLOOR = max(1, int(_c.get("aa_reserve2_floor", RESERVE2_FLOOR) or RESERVE2_FLOOR))
+    RESET_FALLBACK = max(0, int(_c.get("aa_reset_fallback", RESET_FALLBACK) or 0))
 except Exception:
     pass
 
@@ -100,6 +108,12 @@ if _arg("--reserve", str) is not None:
     RESERVED = [n.strip().lower() for n in _arg("--reserve", str).split(",") if n.strip() and n.strip().lower() != "aucun"]
 if _arg("--reserve-floor") is not None:
     RESERVE_FLOOR = max(1, _arg("--reserve-floor"))
+if _arg("--reserve2", str) is not None:
+    RESERVED2 = [n.strip().lower() for n in _arg("--reserve2", str).split(",") if n.strip() and n.strip().lower() != "aucun"]
+if _arg("--reserve2-floor") is not None:
+    RESERVE2_FLOOR = max(1, _arg("--reserve2-floor"))
+if _arg("--reset-fallback") is not None:
+    RESET_FALLBACK = max(0, _arg("--reset-fallback"))
 
 BTN = (0.15, 0.15, 0.85, 0.85)                 # boutons jaunes : on compare le TEXTE, pas le fond (tous identiques)
 SPEC = {                                       # du plus avance au plus ancien
@@ -128,6 +142,14 @@ SPEC = {                                       # du plus avance au plus ancien
     "ua":           dict(cd=3.0, crop=(0, 0.30, 1, 1)),                        # menu principal : icone U.A. (Solo / Co-op)
 }
 OPTIONAL = {"botsgris", "myteam", "revive", "closereset"}                         # images facultatives
+AUTO_OFF_THR = 0.85   # AUTO est un interrupteur : eteint 0,92-0,95, ALLUME 0,68-0,69 (le taper l'eteignait, bug du 16/11)
+
+
+def auto_is_off(score):
+    """AUTO est un interrupteur : le taper quand il est deja allume l'eteint. On ne le tape que s'il est clairement eteint."""
+    return score >= AUTO_OFF_THR
+
+
 FILES = {"revive": "revivefree.png", "cards": "cardflip2.png", "auto": BASE / "templates_nightops" / "auto.png",
          "ua": BASE / "templates_nightops" / "ua.png"}
 # cardflip2.png (1574x532) : centre de l'ancre "Each player can flip" et centres des 5 cartes
@@ -140,6 +162,8 @@ T = {}
 BOT_T = {}
 ST = {}                                         # images des barres de stamina
 CH = {}                                         # visages des persos reserves (templates_aa/chars/<nom>.png)
+CH2 = {}                                        # visages des persos reserves pour les floors RESERVE2_FLOOR+
+STATS = {"chars": {}, "floor_max": 0, "resets": 0, "fallback": None, "current": None}   # bilan de la session
 ICONS = {}                                      # visages de tous les persos connus (sert a trouver ton perso dans le lobby)
 FACE = (0.14, 0.12, 0.86, 0.60)                 # partie comparee d'une icone : le visage (sans cadre, sans "Lv. 90")
 ICON_W = 135                                    # largeur normale d'une icone a l'ecran ; les images plus petites sont agrandies
@@ -175,11 +199,12 @@ def load_templates(strict=True):
             img = cv2.resize(img, None, fx=k, fy=k, interpolation=cv2.INTER_CUBIC)
         h, w = img.shape[:2]
         ICONS[p.stem.lower()] = img[int(FACE[1] * h):int(FACE[3] * h), int(FACE[0] * w):int(FACE[2] * w)]
-    for n in RESERVED:
-        if n in ICONS:
-            CH[n] = ICONS[n]
-        else:
-            missing.append(f"templates_aa/chars/{n}.png (perso reserve)")
+    for names, dst, what in ((RESERVED, CH, "perso reserve"), (RESERVED2, CH2, f"perso reserve {RESERVE2_FLOOR}+")):
+        for n in names:
+            if n in ICONS:
+                dst[n] = ICONS[n]
+            else:
+                missing.append(f"templates_aa/chars/{n}.png ({what})")
     p = TDIR / "nostamina.png"
     if p.exists() and not NOSTAM:
         im = cv2.imread(str(p))
@@ -464,11 +489,21 @@ def close_settings():
 def pick_char(floor=None):
     """Ouvre le menu des persos (aa_char_pos) et en prend un qui a de la stamina.
     Persos reserves : jamais joues sous RESERVE_FLOOR, joues en priorite a partir de RESERVE_FLOOR.
-    -> True / False (plus aucun perso jouable) / None (pas regle)."""
-    high = bool(CH) and floor is not None and floor >= RESERVE_FLOOR
-    if CH:
-        log(f"choix du perso : floor {floor if floor is not None else 'INCONNU'} -> "
-            + (f"reserves en priorite ({', '.join(CH)})" if high else f"reserves gardes pour les floors {RESERVE_FLOOR}+"))
+    Liste 13+ (CH2) : UNIQUEMENT elle a partir de RESERVE2_FLOOR ; epuisee + RESET_FALLBACK -> "reset".
+    -> True / False (plus aucun perso jouable) / None (pas regle) / "reset" (reset de secours)."""
+    known = floor is not None
+    if CH2 and known and floor >= RESERVE2_FLOOR:           # tres haut floor : UNIQUEMENT la liste 13+
+        pool, tier = CH2, f"{RESERVE2_FLOOR}+"
+    elif CH and known and floor >= RESERVE_FLOOR:           # haut floor : UNIQUEMENT la liste 10+
+        pool, tier = CH, f"{RESERVE_FLOOR}+"
+    else:
+        pool, tier = None, None                             # bas floor : jamais un reserve (aucune des deux listes)
+    high = pool is not None
+    allres = {**CH, **CH2}
+    if allres:
+        kept = " ; ".join(f"{', '.join(c)} gardes pour les floors {f}+" for c, f in ((CH, RESERVE_FLOOR), (CH2, RESERVE2_FLOOR)) if c)
+        log(f"choix du perso : floor {floor if known else 'INCONNU'} -> "
+            + (f"reserves {tier} uniquement ({', '.join(pool)})" if high else kept))
     if not open_char_menu():
         log("(!) menu des persos non ouvert : je garde le perso actuel")
         return None
@@ -492,20 +527,21 @@ def pick_char(floor=None):
             seen = seen or bool(bars)
             cands = []
             for x, y, v in bars:
-                who = char_under(s, x, y) if CH else None
-                if who:
+                who = char_under(s, x, y, allres) if allres else None
+                if who and (pool is None or who in pool):
                     res_seen[who] = max(res_seen.get(who, -1), v)
                 if v <= 0:
                     continue
-                if (mode == "reserve" and not who) or (mode == "libre" and who):
+                if (mode == "reserve" and (not who or who not in pool)) or (mode == "libre" and who):
                     continue
                 cands.append((-v, x, y, who))
             if cands:
                 v, x, y, who = min(cands)
                 nt.tap(x, y + ICON_DY)
                 name = who or char_under(s, x, y, ICONS) or "perso inconnu"
-                log(f"perso choisi : {name}{' (reserve)' if who else ''} {-v}/2"
+                log(f"perso choisi : {name}{f' (reserve {tier})' if who else ''} {-v}/2"
                     + (f" | floor {floor}" if floor else ""))
+                STATS["current"] = name + (f" ({tier})" if who else "")
                 time.sleep(1.0)
                 close_settings()
                 return True
@@ -529,15 +565,18 @@ def pick_char(floor=None):
     close_settings()
     if high:
         detail = ", ".join(f"{n} {v}/2" for n, v in sorted(res_seen.items())) or "aucun reconnu dans le menu"
-        missing = [n for n in CH if n not in res_seen]
+        missing = [n for n in pool if n not in res_seen]
         if missing and res_seen:
             detail += " ; non reconnu(s) : " + ", ".join(missing)
+        if pool is CH2 and RESET_FALLBACK:                  # reserves 13+ epuises : reset de secours (pas d'arret)
+            log(f"reserves {tier} epuises ({detail}) : passage au reset de secours (des le floor {RESET_FALLBACK})")
+            return "reset"
         debug_shot("reserves_injouables", nt.screenshot())
-        raise Done(f"Floor {floor} : aucun perso reserve jouable ({detail}). Reserves : {', '.join(CH)}. "
-                   f"Arret pour ne PAS jouer un autre perso au floor {RESERVE_FLOOR}+ : recharge leur stamina, "
+        raise Done(f"Floor {floor} : aucun perso reserve {tier} jouable ({detail}). Reserves {tier} : {', '.join(pool)}. "
+                   f"Arret pour ne PAS jouer un autre perso au floor {tier} : recharge leur stamina, "
                    f"change la liste des reserves ou le floor, puis relance.")
-    if CH:
-        log(f"(!) il ne reste que les persos reserves ({', '.join(CH)}) : je les garde pour les floors {RESERVE_FLOOR}+")
+    if allres:
+        log(f"(!) il ne reste que les persos reserves ({', '.join(allres)}) : je les garde pour les hauts floors")
     return False
 
 
@@ -559,7 +598,28 @@ def run_test():
 
 
 # ---------------------------------------------------------------- boucle principale
+def bilan():
+    """Bilan de la session AA (fin du journal -> message de fin sur Discord)."""
+    n = sum(STATS["chars"].values())
+    if not n and not STATS["resets"]:
+        return
+    print(f"=== BILAN AA : {n} combat(s) | floor max : {STATS['floor_max'] or '?'} | resets : {STATS['resets']}", flush=True)
+    if STATS["chars"]:
+        print("   persos : " + ", ".join(f"{k} x{v}" for k, v in sorted(STATS["chars"].items(), key=lambda kv: -kv[1])),
+              flush=True)
+    if STATS["fallback"]:
+        print(f"   reserves {RESERVE2_FLOOR}+ epuises a {STATS['fallback']} : reset de secours des le floor {RESET_FALLBACK}",
+              flush=True)
+
+
 def main():
+    try:
+        _main()
+    finally:
+        bilan()
+
+
+def _main():
     global FLOOR
     if "--capture" in sys.argv:
         nt.init_adb()
@@ -577,6 +637,7 @@ def main():
     WD = watchdog.make(nt.screenshot, nt.tap, nt.adb, log, Done)
     last = {n: 0.0 for n in SPEC}
     runs, auto_taps = 0, 0
+    auto_seen_on = False
     in_battle, t_start = False, 0.0
     bots_done, char_done, flipped = False, False, False
     floor, floor_known = FLOOR, FLOOR is not None       # floor courant ; connu = lu sur le permit, donne, ou apres un reset
@@ -588,7 +649,9 @@ def main():
     print(f"Agency Assessment : {MAX_RUNS} combat(s) | bots : {', '.join(BOT_NAMES[b] for b in BOTS) or 'aucun'} | "
           f"reset du permit : {'a partir du floor ' + str(RESET_FLOOR) if RESET_FLOOR else 'jamais'} | "
           f"floor de depart : {floor if floor_known else 'a lire'}"
-          + (f" | reserves pour les floors {RESERVE_FLOOR}+ : {', '.join(CH)}" if CH else "") + ". Ctrl+C pour arreter.")
+          + (f" | reserves pour les floors {RESERVE_FLOOR}+ : {', '.join(CH)}" if CH else "")
+          + (f" | reserves pour les floors {RESERVE2_FLOOR}+ : {', '.join(CH2)}" if CH2 else "")
+          + (f" | reset de secours : floor {RESET_FALLBACK}" if RESET_FALLBACK else "") + ". Ctrl+C pour arreter.")
 
 
     def tap_key(key, h, extra=""):
@@ -651,6 +714,8 @@ def main():
                 last.pop("_read", None)
                 last.pop("_fl0", None)
                 log(f"combat termine ({runs}/{MAX_RUNS})")
+                who = STATS["current"] or "perso deja place"
+                STATS["chars"][who] = STATS["chars"].get(who, 0) + 1
             in_battle, flipped, bots_done, char_done, deploy_tries, nav_taps = False, False, False, False, 0, 0
             if WD:
                 WD.kick()
@@ -666,9 +731,14 @@ def main():
         if in_battle:
             if ("auto" in ready and auto_taps < nt.AUTO_MAX_TAPS and "deploy" not in hits and not title
                     and hits["auto"][1] < 0.30 * screen.shape[0]):     # le bouton AUTO est en haut de l'ecran de combat
-                auto_taps += 1
-                tap_key("auto", hits["auto"])
-                continue
+                if auto_is_off(hits["auto"][2]):                        # AUTO ETEINT (mesure 0,92-0,95) : on l'allume
+                    auto_taps += 1
+                    tap_key("auto", hits["auto"])
+                    continue
+                if not auto_seen_on:                                    # 0,6-0,85 = AUTO deja ALLUME (0,68-0,69) : ne pas taper
+                    auto_seen_on = True
+                    log(f"AUTO deja actif ({hits['auto'][2]:.2f}) : on n'y touche pas")
+                    debug_shot("auto_actif", screen)
             if "deploy" not in hits and "permit" not in hits:
                 if now - t_start > 15:
                     deploy_tries = 0                       # le combat a bien demarre
@@ -694,6 +764,7 @@ def main():
                         last.pop("_fl0", None)
                         after_reset = time.time()          # il reste a fermer la page avec la croix (closereset)
                         log("permit remis au floor 1")
+                        STATS["resets"] += 1
                     break
             else:
                 if now - last_action > 12 and "deploy" not in hits and ("closereset" in ready or "closebots" in ready):
@@ -765,8 +836,10 @@ def main():
                         last["_flcap"] = now
                         log("(!) floor ILLISIBLE apres 30 s : pas de reset, et les persos reserves ne seront pas utilises ce combat")
                         debug_shot("floor_illisible", screen)
-                if RESET_FLOOR and floor_known and floor >= RESET_FLOOR:
-                    log(f"floor {floor} : reset du permit (regle a partir du floor {RESET_FLOOR})")
+                eff = RESET_FALLBACK if STATS["fallback"] else RESET_FLOOR
+                if eff and floor_known and floor >= eff:
+                    log(f"floor {floor} : reset du permit (regle a partir du floor {eff}"
+                        + (", reset de secours : reserves 13+ epuises)" if STATS["fallback"] else ")"))
                     resetting, last_action = True, time.time()
                     continue
             if "bots" not in hits and BOTS and not bots_done and bots_grey(screen):
@@ -779,6 +852,11 @@ def main():
             if not char_done and (bots_done or not BOTS):
                 r = pick_char(floor if floor_known else None)
                 char_done, last_action = True, time.time()
+                if r == "reset":                           # reserves 13+ epuises : reset maintenant, puis des RESET_FALLBACK
+                    if not STATS["fallback"]:
+                        STATS["fallback"] = time.strftime("%H:%M")
+                    char_done, need_char, resetting = False, False, True
+                    continue
                 if need_char and not r:
                     raise Done(f"Plus de stamina sur ce perso et aucun autre perso jouable. {runs}/{MAX_RUNS} combat(s) faits. Fini !")
                 need_char = False
@@ -789,7 +867,10 @@ def main():
             if "deploy" in ready and ("permit" in hits or "insertpermit" not in hits) and (bots_done or not BOTS):
                 deploy_tries += 1
                 tap_key("deploy", hits["deploy"], f" (essai {deploy_tries})" if deploy_tries > 1 else "")
+                if floor_known and floor:
+                    STATS["floor_max"] = max(STATS["floor_max"], floor)
                 in_battle, t_start, auto_taps, flipped = True, time.time(), 0, False
+                auto_seen_on = False
                 continue
             time.sleep(nt.LOOP_DELAY)
             continue

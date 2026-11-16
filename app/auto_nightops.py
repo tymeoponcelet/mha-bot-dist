@@ -21,6 +21,8 @@ Dossier templates_nightops/ (captures a la MEME resolution que l'emulateur) :
   (ex. --hero mirio) ; sa ligne est dans templates_chars/<nom>.png. Si la ligne n'est pas visible, le bot fait defiler
   la liste (bas puis haut) jusqu'a la trouver, puis tape SON bouton "Deploy" (voir heroes.py).
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import shutil
 import subprocess

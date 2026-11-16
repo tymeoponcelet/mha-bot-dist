@@ -9,6 +9,8 @@ Ordre, du plus doux au plus fort :
 Au plus MAX_RECOVER reprises par WINDOW secondes : au-dela, le script s'arrete comme avant (incident final).
 config.json n'est jamais modifie ici.
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import os
 import subprocess

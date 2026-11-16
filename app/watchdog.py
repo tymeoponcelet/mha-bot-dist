@@ -31,6 +31,8 @@ Images (dossier templates_watchdog/, a la meme resolution que l'emulateur) :
 Tests :  python watchdog.py --test   scores des images sur l'ecran actuel, couleur de la pastille, paquet du jeu
          python watchdog.py --now    ferme et relance le jeu tout de suite, puis revient au menu principal
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import re
 import sys

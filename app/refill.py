@@ -21,6 +21,8 @@ Autres reglages (config.json) : "refill_code" (defaut BETASTAMINA), "refill_coun
 Test sur l'emulateur :  python refill.py --test     (scores de chaque image, ne clique sur rien)
                         python refill.py --now      (lance la recharge tout de suite, depuis n'importe quel ecran)
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import sys
 import time

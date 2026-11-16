@@ -5,6 +5,8 @@ Cree discord_config.json en te posant quelques questions (appele automatiquement
   3. l'identifiant du serveur  (clic droit sur le nom du serveur > Copier l'identifiant du serveur)
   4. reponses privees ou visibles par tout le serveur
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import re
 import sys

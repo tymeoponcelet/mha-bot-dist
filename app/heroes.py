@@ -10,6 +10,8 @@ Choix du PERSONNAGE (liste qui s'ouvre apres le "+" dans Night Ops, Supply et He
 
 Ce module ne depend d'aucun bot : chaque bot lui passe sa fonction adb et sa fonction de log.
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import sys
 import time

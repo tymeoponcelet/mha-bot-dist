@@ -27,6 +27,8 @@ Dossier templates_hero/ (captures a la MEME resolution que l'emulateur) :
     again.png insufficient.png exit.png    fin de combat
   Optionnels : auto_on.png (AUTO active), continue.png, close.png
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import shutil
 import subprocess

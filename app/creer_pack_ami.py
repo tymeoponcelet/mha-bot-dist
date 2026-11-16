@@ -4,6 +4,8 @@ Cree "mha script.zip" : le pack a donner a un ami (bot Discord + assistant + ima
   - Verifie ensuite le contenu du zip : si un secret (fichier ou token Discord) s'y trouve, le zip est supprime.
 Utilisation : double-clic sur creer_pack_ami.bat  (ou : python creer_pack_ami.py)
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import re
 import sys
 import zipfile

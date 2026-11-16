@@ -3,6 +3,8 @@
 Chez un ami installe par le lanceur : ../installed.json (ecrit par updater.py) -> numero, message, historique.
 Chez le createur (pas de lanceur) : « version de developpement ».
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 from pathlib import Path
 

@@ -23,6 +23,8 @@ Syntaxe d'une etape :
 Une etape reussie se termine par "Fini !". Si une etape s'arrete sur une erreur (plus de stamina, ecran inconnu...),
 on passe a la suivante, sauf avec --stop-on-error. Ctrl+C arrete tout. Un recapitulatif est affiche a la fin.
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import signal
 import subprocess
@@ -51,7 +53,10 @@ def parse_token(tok):
             return dict(mode="aa", runs=int(p[1]) if len(p) > 1 else 10, bots=p[2] if len(p) > 2 else None,
                         reset=int(p[3]) if len(p) > 3 and p[3] else None,
                         reserve=p[4].lower() if len(p) > 4 and p[4] else None,
-                        resfloor=int(p[5]) if len(p) > 5 and p[5] else None)
+                        resfloor=int(p[5]) if len(p) > 5 and p[5] else None,
+                        reserve2=p[6].lower() if len(p) > 6 and p[6] else None,         # reserves floors 13+
+                        resfloor2=int(p[7]) if len(p) > 7 and p[7] else None,
+                        fallback=int(p[8]) if len(p) > 8 and p[8] else None)            # reset de secours
         if kind in ("whm", "event", "evenement", "entrance", "hallway", "library"):
             return dict(mode="whm", event=kind if kind in ("hallway", "library") else "entrance", level=int(p[1]),
                         runs=int(p[2]) if len(p) > 2 else 1, hero=p[3] if len(p) > 3 else None)
@@ -79,14 +84,23 @@ def validate(st):
         st["event"] = st.get("event") if st.get("event") in ("entrance", "hallway", "library") else "entrance"
     elif m == "aa":
         st["runs"] = max(1, int(st.get("runs", 10)))
-        if st.get("reserve"):                     # persos reserves pour les hauts floors ("aucun" = personne)
-            names = [n.strip().lower() for n in str(st["reserve"]).split(",") if n.strip() and n.strip().lower() != "aucun"]
-            absent = [n for n in names if not (BASE / "templates_aa" / "chars" / f"{n}.png").exists()]
-            if absent:
-                raise SystemExit("Agency : perso reserve inconnu (pas d'icone templates_aa/chars/) : " + ", ".join(absent))
-            st["reserve"] = ",".join(names) or "aucun"
-        if st.get("resfloor") is not None:
-            st["resfloor"] = max(1, int(st["resfloor"]))
+        for key in ("reserve", "reserve2"):       # persos reserves pour les hauts floors ("aucun" = personne)
+            if st.get(key):
+                names = [n.strip().lower() for n in str(st[key]).split(",") if n.strip() and n.strip().lower() != "aucun"]
+                absent = [n for n in names if not (BASE / "templates_aa" / "chars" / f"{n}.png").exists()]
+                if absent:
+                    raise SystemExit("Agency : perso reserve inconnu (pas d'icone templates_aa/chars/) : " + ", ".join(absent))
+                st[key] = ",".join(names) or "aucun"
+        both = set(str(st.get("reserve") or "").split(",")) & set(str(st.get("reserve2") or "").split(",")) - {"", "aucun"}
+        if both:
+            raise SystemExit("Agency : un perso ne peut etre que dans UNE liste de reserves (10+ ou 13+) : " + ", ".join(sorted(both)))
+        for key in ("resfloor", "resfloor2"):
+            if st.get(key) is not None:
+                st[key] = max(1, int(st[key]))
+        if st.get("resfloor2") and st["resfloor2"] <= (st.get("resfloor") or 10):
+            raise SystemExit("Agency : le 2e palier (13+) doit etre au-dessus du 1er (10+).")
+        if st.get("fallback") is not None:
+            st["fallback"] = max(0, int(st["fallback"]))
     elif m == "hero":
         if not st.get("chars"):
             raise SystemExit("Hero Trial : indique les persos a farmer (ex. hero:deku,denki).")
@@ -153,7 +167,9 @@ def token(st):
         return f"{st.get('event', 'entrance')}:{st['level']}:{st['runs']}{h}"
     if m == "aa":
         f = [str(st["runs"]), st.get("bots") or "", "" if st.get("reset") is None else str(st["reset"]),
-             st.get("reserve") or "", str(st["resfloor"]) if st.get("resfloor") else ""]
+             st.get("reserve") or "", str(st["resfloor"]) if st.get("resfloor") else "",
+             st.get("reserve2") or "", str(st["resfloor2"]) if st.get("resfloor2") else "",
+             str(st["fallback"]) if st.get("fallback") else ""]
         while len(f) > 1 and f[-1] == "":              # champs facultatifs vides en fin : on les retire
             f.pop()
         return "aa:" + ":".join(f)
@@ -177,6 +193,11 @@ def describe(st):
         if st.get("reserve"):
             who = ", ".join(aa_name(c) for c in st["reserve"].split(",") if c and c != "aucun")
             res = f" · réservés floors {st.get('resfloor') or 10}+ : {who}" if who else " · aucun perso réservé"
+        if st.get("reserve2"):
+            who = ", ".join(aa_name(c) for c in st["reserve2"].split(",") if c and c != "aucun")
+            res += f" · floors {st.get('resfloor2') or 13}+ : {who}" if who else ""
+        if st.get("fallback"):
+            res += f" · reset de secours au floor {st['fallback']}"
         return f"Agency Assessment · {st['runs']} combat(s)" + (f" · bots {bots}" if bots else "") + reset + res
     chars = ", ".join(c.capitalize() for c in str(st.get("chars", "")).split(",") if c)
     return f"Hero Trial · {chars}{h}"
@@ -209,6 +230,12 @@ def command(st):
             c += ["--reserve", str(st["reserve"])]
         if st.get("resfloor"):
             c += ["--reserve-floor", str(st["resfloor"])]
+        if st.get("reserve2"):
+            c += ["--reserve2", str(st["reserve2"])]
+        if st.get("resfloor2"):
+            c += ["--reserve2-floor", str(st["resfloor2"])]
+        if st.get("fallback") is not None:
+            c += ["--reset-fallback", str(st["fallback"])]
         if WATCHDOG is not None:
             c.append("--watchdog" if WATCHDOG else "--no-watchdog")
         return c                                   # pas de --hero ni de recharge de stamina dans ce mode

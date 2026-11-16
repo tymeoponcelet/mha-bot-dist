@@ -19,6 +19,8 @@ Dossier templates_supply/ : supply, food, money, gear, card, crystals (cartes de
 lvlcard, lvlcrystals (carte des niveaux), confirm (bouton "Confirm" du panneau qui s'ouvre apres le choix du niveau). Les images communes (ua, solo, plus, am, multirun, max, start, continue,
 challagain, controlbattle, auto) sont reprises de templates_nightops/ si elles ne sont pas dans templates_supply/.
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 
 import sys

@@ -7,6 +7,8 @@
 - Un farm vise une instance par la variable d'environnement MHA_DEVICE (posee par l'assistant / Discord) : le script
   utilise CETTE instance et ne se rabat jamais sur une autre (sinon il jouerait sur le mauvais compte).
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import os
 import subprocess

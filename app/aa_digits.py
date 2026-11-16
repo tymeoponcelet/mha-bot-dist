@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Lecture du numero de floor sur le permit : decoupe le masque jaune en chiffres, puis reconnait chaque chiffre
 (1) par comparaison aux chiffres connus de templates_aa/digits/<chiffre>*.png, sinon (2) par sa forme "7 segments"."""
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 from pathlib import Path
 import cv2
 import numpy as np

@@ -6,6 +6,8 @@ A chaque detection (score >= seuil), fastmatch appelle note(). Pendant un vrai f
     sessions precedentes, au moins MIN_SESS), alerte Discord (incident "derive", une fois par image et par session)
     avec la capture : il est temps de refaire cette image.
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import atexit
 import json
 import statistics

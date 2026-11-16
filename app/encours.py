@@ -6,6 +6,8 @@ Il met a jour sa progression (run X/Y, etape d'enchainement, derniere ligne) et 
 read() ne renvoie le farm que si son processus tourne encore (pid + heure de creation verifies).
 stop() arrete le farm (et les scripts lances par l'enchaineur).
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import os
 import sys

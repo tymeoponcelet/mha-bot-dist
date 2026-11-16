@@ -37,6 +37,8 @@ IMAGES (dossier templates_whm/, a la resolution de ton emulateur) :
 Le reste est repris des autres modes : plus, auto, continue, controlbattle (templates_nightops/),
 continuechall + confirm (templates_supply/), exit (templates_hero/), ua (templates_nightops/).
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import sys
 import time

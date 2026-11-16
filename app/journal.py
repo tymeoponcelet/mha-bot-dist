@@ -10,6 +10,8 @@
 - Rotation : on garde les KEEP derniers journaux.
 - Les dernieres lignes restent aussi en memoire (tail()) pour les rapports d'incident.
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import collections
 import os
 import sys

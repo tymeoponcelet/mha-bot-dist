@@ -26,6 +26,8 @@ silencieux pour les autres. Les reponses sont privees (visibles seulement par ce
 Quand un script se termine (ou s'arrete sur une erreur), tu recois un message prive avec les dernieres lignes.
 Configuration : discord_config.json (voir discord_config.example.json). Ne partage JAMAIS ce fichier : il contient le token.
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import asyncio
 import collections
 import io
@@ -691,6 +693,9 @@ async def whm_cmd(interaction: discord.Interaction, evenement: app_commands.Choi
     floor_actuel="Floor actuel du permit, seulement si le bot n'arrive pas à le lire tout seul",
     reserves="Persos gardés pour les hauts floors, ex. am,endy,hawks (aucun = pas de réserve)",
     floor_reserve="Les persos réservés ne sont joués qu'à partir de ce floor (10 par défaut)",
+    reserves_13="Persos joués UNIQUEMENT aux très hauts floors, ex. am,endy (aucun = pas de 2e liste)",
+    floor_13="Floor à partir duquel jouer UNIQUEMENT les réservés 13+ (13 par défaut)",
+    reset_secours="Plus aucun réservé 13+ jouable : reset dès ce floor (0 = arrêt + alerte)",
     gardien="Relancer le jeu si maintenance ou blocage. Vide = réglage de /reglages",
     remplacer="Oui = arrête le script déjà en cours pour lancer celui-ci")
 @app_commands.choices(bot1=AA_CHOICES, bot2=AA_CHOICES)
@@ -698,6 +703,8 @@ async def aa_cmd(interaction: discord.Interaction, combats: app_commands.Range[i
                  bot1: app_commands.Choice[str] = None, bot2: app_commands.Choice[str] = None,
                  reset_floor: app_commands.Range[int, 0, 99] = None, floor_actuel: app_commands.Range[int, 1, 99] = None,
                  reserves: str = None, floor_reserve: app_commands.Range[int, 1, 99] = None,
+                 reserves_13: str = None, floor_13: app_commands.Range[int, 2, 99] = None,
+                 reset_secours: app_commands.Range[int, 0, 99] = None,
                  gardien: bool = None, remplacer: bool = False):
     await interaction.response.defer(ephemeral=EPH)
     bots = [b.value for b in (bot1, bot2) if b]
@@ -713,7 +720,17 @@ async def aa_cmd(interaction: discord.Interaction, combats: app_commands.Range[i
         command += ["--floor", str(floor_actuel)]
     res = [n.strip().lower() for n in reserves.split(",") if n.strip()] if reserves is not None else list(cfg_get("aa_reserved") or [])
     res = [n for n in res if n != "aucun"]
-    absent = [n for n in res if not (BASE / "templates_aa" / "chars" / f"{n}.png").exists()]
+    res2 = [n.strip().lower() for n in reserves_13.split(",") if n.strip()] if reserves_13 is not None \
+        else list(cfg_get("aa_reserved2") or [])
+    res2 = [n for n in res2 if n != "aucun"]
+    if reserves_13 is None:
+        res2 = [n for n in res2 if n not in res]             # reglage de l'assistant : un perso dans une seule liste
+    both = sorted(set(res) & set(res2))
+    if both:
+        await interaction.followup.send(embed=embed("❌ Perso dans les deux listes", "Un perso ne peut être que dans UNE liste "
+                                                    "(réservés ou réservés 13+) : **" + ", ".join(both) + "**.", COLORS["bad"]))
+        return
+    absent = [n for n in res + res2 if not (BASE / "templates_aa" / "chars" / f"{n}.png").exists()]
     if absent:
         await interaction.followup.send(embed=embed("❌ Perso réservé inconnu", "Pas d'icône `templates_aa/chars/<nom>.png` pour : **"
                                                     + ", ".join(absent) + "**.\nNoms possibles : "
@@ -722,11 +739,20 @@ async def aa_cmd(interaction: discord.Interaction, combats: app_commands.Range[i
         return
     rfl = floor_reserve or int(cfg_get("aa_reserve_floor", 10) or 10)
     command += ["--reserve", ",".join(res) or "aucun", "--reserve-floor", str(rfl)]
+    rfl2 = floor_13 or int(cfg_get("aa_reserve2_floor", 13) or 13)
+    sec = reset_secours if reset_secours is not None else int(cfg_get("aa_reset_fallback", 0) or 0)
+    if res2 and rfl2 <= rfl:
+        await interaction.followup.send(embed=embed("❌ Floors des réservés", f"Le floor des réservés 13+ ({rfl2}) doit être "
+                                                    f"au-dessus de celui des réservés ({rfl}).", COLORS["bad"]))
+        return
+    command += ["--reserve2", ",".join(res2) or "aucun", "--reserve2-floor", str(rfl2), "--reset-fallback", str(sec)]
     if gardien is not None:
         command.append("--watchdog" if gardien else "--no-watchdog")
     details = (f"**{n}** combat{'s' if n > 1 else ''}\n🤖 Bots : **{' + '.join(AA_BOTS[b] for b in bots) or 'aucun'}**\n"
                f"♻️ Reset du permit : **{'à partir du floor ' + str(rf) if rf else 'jamais'}**"
-               + (f"\n🔒 Réservés pour les floors {rfl}+ : **{', '.join(n.capitalize() for n in res)}**" if res else ""))
+               + (f"\n🔒 Réservés pour les floors {rfl}+ : **{', '.join(n.capitalize() for n in res)}**" if res else "")
+               + (f"\n🔵 Réservés pour les floors {rfl2}+ : **{', '.join(n.capitalize() for n in res2)}**" if res2 else "")
+               + (f"\n🆘 Reset de secours (13+ épuisés) : **floor {sec}**" if res2 and sec else ""))
     await start_script(interaction, command, f"Agency Assessment x{n}", remplacer, "aa", details, False, gardien)
 
 
@@ -947,7 +973,8 @@ PLAN_MODES = [app_commands.Choice(name=n, value=k) for k, (n, _st) in ec.MODES_U
     app_commands.Choice(name="🔗 L'enchaînement préparé dans l'assistant", value="enchainement")]
 
 
-def plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset, reserves=None, floor_reserve=None):
+def plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset, reserves=None, floor_reserve=None,
+              reserves_13=None, floor_13=None, reset_secours=None):
     """Les menus de /planifier -> une etape validee (SystemExit / ValueError si impossible)."""
     st = dict(ec.MODES_UI[mode][1])
     if runs:
@@ -971,6 +998,10 @@ def plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset, r
         if reserves is not None:                               # sinon : reglage de l'assistant au moment du farm
             st["reserve"] = reserves.replace(" ", "") or "aucun"
         st["resfloor"] = floor_reserve or None
+        if reserves_13 is not None:                            # sinon : reglage de l'assistant au moment du farm
+            st["reserve2"] = reserves_13.replace(" ", "") or "aucun"
+        st["resfloor2"] = floor_13 or None
+        st["fallback"] = reset_secours or None
     elif perso:
         st["hero"] = perso
     return ec.validate(st)
@@ -985,6 +1016,9 @@ def plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset, r
     bot1="Agency : 1er bot", bot2="Agency : 2e bot", reset="Agency : remettre le permit au floor 1 à partir de ce floor",
     reserves="Agency : persos réservés aux hauts floors, ex. mirio,hawks (aucun = personne ; vide = assistant)",
     floor_reserve="Agency : floor à partir duquel jouer les réservés (défaut : 10)",
+    reserves_13="Agency : persos joués UNIQUEMENT aux très hauts floors, ex. am,endy (vide = assistant)",
+    floor_13="Agency : floor des réservés 13+ (défaut : 13)",
+    reset_secours="Agency : plus aucun réservé 13+ jouable -> reset dès ce floor",
     sequence="Avancé : étapes écrites comme /enchainer (remplace les menus)",
     stamina="Recharger la stamina avec le code quand il n'y en a plus. Vide = réglage général au moment du farm",
     gardien="Relancer le jeu si maintenance ou blocage. Vide = réglage général au moment du farm")
@@ -995,6 +1029,8 @@ async def planifier_cmd(interaction: discord.Interaction, heure: str, mode: str 
                         runs: app_commands.Range[int, 1, 500] = None, perso: str = None, persos: str = None,
                         bot1: str = None, bot2: str = None, reset: app_commands.Range[int, 2, 30] = None,
                         reserves: str = None, floor_reserve: app_commands.Range[int, 1, 99] = None,
+                        reserves_13: str = None, floor_13: app_commands.Range[int, 2, 99] = None,
+                        reset_secours: app_commands.Range[int, 2, 99] = None,
                         sequence: str = None, stamina: bool = None, gardien: bool = None):
     await interaction.response.defer(ephemeral=EPH)
     import planificateur as pl
@@ -1007,7 +1043,8 @@ async def planifier_cmd(interaction: discord.Interaction, heure: str, mode: str 
                 raise ValueError("L'enchaînement de l'assistant est vide : prépare-le (mode Enchaîner) ou choisis un mode.")
             seq = " ".join(ec.token(s) for s in steps)
         else:
-            seq = ec.token(plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset, reserves, floor_reserve))
+            seq = ec.token(plan_step(mode, ressource, niveau, runs, perso, persos, bot1, bot2, reset, reserves, floor_reserve,
+                                     reserves_13, floor_13, reset_secours))
         it, _m = await asyncio.to_thread(pl.add, heure, jours, seq, refill=stamina, watchdog=gardien)
     except (ValueError, SystemExit) as e:
         await interaction.followup.send(embed=embed("❌ Créneau refusé", str(e)[:1500], COLORS["bad"],

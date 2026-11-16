@@ -7,6 +7,8 @@ Fichiers : config.json, planning.json, profils.json, sequence.json. JAMAIS disco
 pas de copie ; configurer_discord.bat le recree).
 Quand : une fois par jour (assistant / bot Discord), avant une mise a jour, avant une restauration.
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import shutil
 import time

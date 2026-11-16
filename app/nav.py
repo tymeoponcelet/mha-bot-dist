@@ -19,6 +19,8 @@ Utilisation seule :
     python nav.py            # retourne au menu principal
     python nav.py --test     # UNE capture : score de ua / home / close / continue
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import sys
 import time
 from pathlib import Path

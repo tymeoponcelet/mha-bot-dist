@@ -4,6 +4,8 @@
 
 Chaque verification -> (cle, etat, texte, conseil) avec etat = "ok" | "warn" | "bad".
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import re
 import subprocess

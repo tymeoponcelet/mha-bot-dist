@@ -5,6 +5,8 @@
 - Bot partage entre plusieurs PC : chaque PC recoit tous les clics ; seul le PC du proprietaire (ALLOWED) repond,
   les autres se taisent (comme pour les commandes).
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import asyncio
 import io
 import json
@@ -522,7 +524,7 @@ class FarmView(OwnerView):
                           color=B.COLORS.get(KIND[self.st["mode"]], B.COLORS["info"]))
         tips = "Choisis dans les menus, puis ▶ Lancer (ou 🗓️ Programmer). 🔋 / 🛡️ : pour ce lancement seulement."
         if aa:
-            tips += " Floor des réservés : réglage de l'assistant (10 par défaut)."
+            tips += " Floors des réservés, réservés 13+ et reset de secours : réglages de l'assistant (ou /aa)."
         e.set_footer(text=tips)
         return e
 
@@ -613,6 +615,13 @@ class FarmView(OwnerView):
         if self.key == "aa":
             self.st["bots"] = ",".join([b for b in (B.cfg_get("aa_bots") or ["deku", "bakugo"]) if b in self.ec.AA_BOTS][:2])
             self.st["reserve"] = ",".join(c for c in (B.cfg_get("aa_reserved") or []) if c in self.ec.aa_chars()) or None
+            r1 = set(str(self.st["reserve"] or "").split(","))
+            r2 = [c for c in (B.cfg_get("aa_reserved2") or []) if c in self.ec.aa_chars() and c not in r1]
+            if r2:                                        # 2e palier : repris de l'assistant (plus de place dans le message)
+                self.st["reserve2"] = ",".join(r2)
+                self.st["resfloor"] = int(B.cfg_get("aa_reserve_floor", 10) or 10)
+                self.st["resfloor2"] = int(B.cfg_get("aa_reserve2_floor", 13) or 13)
+                self.st["fallback"] = int(B.cfg_get("aa_reset_fallback", 0) or 0) or None
         elif hero:
             self.st["hero"] = hero
         await self.refresh(interaction)
@@ -645,6 +654,9 @@ class FarmView(OwnerView):
 
     async def on_reserve(self, interaction):
         self.st["reserve"] = ",".join(interaction.data["values"]) or "aucun"
+        if self.st.get("reserve2"):                      # un perso choisi ici quitte la liste 13+
+            self.st["reserve2"] = ",".join(c for c in self.st["reserve2"].split(",")
+                                           if c not in interaction.data["values"]) or None
         await self.refresh(interaction)
 
     async def on_reset(self, interaction):

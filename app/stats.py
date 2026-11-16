@@ -6,6 +6,8 @@ Une session = un lancement d'un mode (une etape d'enchainement compte comme une 
 Lignes du fichier (JSON) : {"id", "ev": "debut" | "progres" | "fin", ...} ; on garde la derniere info de chaque session.
 Une session sans ligne "fin" a ete coupee (/stop, fenetre fermee) ou tourne encore : "interrompu".
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import os
 import re

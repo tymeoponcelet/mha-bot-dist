@@ -1,4 +1,6 @@
 """Petites fonctions identiques partagees par plusieurs modes (sans etat, sans effet de bord)."""
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import sys
 
 import cv2

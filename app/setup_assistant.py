@@ -10,6 +10,8 @@ MHA BOT - Assistant (Windows).  Interface "Plus Ultra" :)
 Réglages enregistrés dans config.json (à côté de ce fichier).
 Aucune dépendance : uniquement tkinter (fourni avec Python).
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import os
 import re
@@ -237,6 +239,30 @@ class StepEditor(tk.Frame):
                 tk.Checkbutton(row, text=ec.aa_name(c), variable=v, bg=self.bg, fg=TEXT, selectcolor=BG,
                                activebackground=self.bg, activeforeground=TEXT, font=F(9)).pack(side="left")
                 self.w["reserve"][c] = v
+            # 2e palier : persos reserves pour les floors 13+ (UNIQUEMENT eux) + reset de secours
+            pre2 = set(cfg.get("aa_reserved2") or []) - pre
+            rrow2 = tk.Frame(self.opts, bg=self.bg)
+            rrow2.pack(fill="x", pady=(6, 0))
+            rf2 = str(int(cfg.get("aa_reserve2_floor", 13) or 13))
+            self.w["resfloor2"] = self._combo(rrow2, "2e palier (13+) à partir du floor", floors, 4,
+                                              floors.index(rf2) if rf2 in floors else floors.index("13"))
+            fb = int(cfg.get("aa_reset_fallback", 0) or 0)
+            fbs = ["aucun"] + [str(i) for i in range(2, 31)]
+            self.w["fallback"] = self._combo(rrow2, "Reset de secours (13+ épuisés) au floor", fbs, 6,
+                                             fbs.index(str(fb)) if str(fb) in fbs else 0)
+            self.w["reserve2"] = {}
+            row = None
+            for i, c in enumerate(ec.aa_chars()):
+                if i % 9 == 0:
+                    row = tk.Frame(self.opts, bg=self.bg)
+                    row.pack(fill="x", padx=(12, 0))
+                v2 = tk.BooleanVar(value=c in pre2)
+                tk.Checkbutton(row, text=ec.aa_name(c), variable=v2, bg=self.bg, fg=BLUE, selectcolor=BG,
+                               activebackground=self.bg, activeforeground=BLUE, font=F(9)).pack(side="left")
+                self.w["reserve2"][c] = v2
+                v1 = self.w["reserve"][c]             # un perso dans UNE seule liste : cocher l'une decoche l'autre
+                v1.trace_add("write", lambda *_a, a=v1, b=v2: b.set(False) if a.get() else None)
+                v2.trace_add("write", lambda *_a, a=v1, b=v2: a.set(False) if b.get() else None)
         if k == "hero":
             tk.Label(row, text="Persos à farmer", bg=self.bg, fg=MUTED, font=F(9, True)).pack(side="left", padx=(0, 6))
             self.w["chars"] = {}
@@ -287,6 +313,10 @@ class StepEditor(tk.Frame):
             st["reset"] = None if self.w["reset"].current() == 0 else int(self.w["reset"].get())
             st["reserve"] = ",".join(c for c, v in self.w["reserve"].items() if v.get()) or "aucun"
             st["resfloor"] = int(self.w["resfloor"].get())
+            r2 = ",".join(c for c, v in self.w["reserve2"].items() if v.get())
+            st["reserve2"] = r2 or None
+            st["resfloor2"] = int(self.w["resfloor2"].get()) if r2 else None
+            st["fallback"] = (None if self.w["fallback"].current() == 0 else int(self.w["fallback"].get())) if r2 else None
         elif self.w["hero"].current() > 0:
             st["hero"] = self.heroes[self.w["hero"].current() - 1]
         try:
@@ -323,6 +353,10 @@ class App(tk.Tk):
             if (BASE / "templates_aa" / "chars").is_dir() else []
         self.aa_reserved = [n for n in (self.cfg.get("aa_reserved") or []) if n in self.aa_chars]
         self.aa_resfloor = int(self.cfg.get("aa_reserve_floor", 10) or 10)
+        self.aa_reserved2 = [n for n in (self.cfg.get("aa_reserved2") or []) if n in self.aa_chars and n not in self.aa_reserved]
+        self.aa_resfloor2 = int(self.cfg.get("aa_reserve2_floor", 13) or 13)
+        self.aa_fallback = int(self.cfg.get("aa_reset_fallback", 0) or 0)
+        self.aa_tier = 1                                 # liste editee par les boutons des persos : 1 = 10+, 2 = 13+
         self.whm_level = int(self.cfg.get("whm_level", 3) or 3)
         self.whm_lvl_btns = {}
         self.whm_event = self.cfg.get("whm_event") if self.cfg.get("whm_event") in WHM_EVENTS else "entrance"
@@ -569,8 +603,26 @@ class App(tk.Tk):
         self.aa_resfloor_lbl = tk.Label(rrow3, text="", bg=CARD, fg=YELLOW, font=F(12, True), width=4)
         self.aa_resfloor_lbl.pack(side="left")
         Btn(rrow3, "+", lambda: self.step_aa("aa_resfloor", 1), bg=GREY, fg=TEXT, size=11, padx=10, pady=2).pack(side="left")
-        self.aa_res_lbl = tk.Label(rrow3, text="", bg=CARD, fg=YELLOW, font=F(9, True), anchor="w")
-        self.aa_res_lbl.pack(side="left", padx=(12, 0))
+        tk.Label(rrow3, text="2e palier (13+) à partir du floor", bg=CARD, fg=TEXT, font=F(11, True)).pack(side="left", padx=(24, 0))
+        Btn(rrow3, "−", lambda: self.step_aa("aa_resfloor2", -1), bg=GREY, fg=TEXT, size=11, padx=10, pady=2).pack(side="left", padx=(8, 0))
+        self.aa_resfloor2_lbl = tk.Label(rrow3, text="", bg=CARD, fg=BLUE, font=F(12, True), width=4)
+        self.aa_resfloor2_lbl.pack(side="left")
+        Btn(rrow3, "+", lambda: self.step_aa("aa_resfloor2", 1), bg=GREY, fg=TEXT, size=11, padx=10, pady=2).pack(side="left")
+        rrow4 = tk.Frame(self.aa_opts, bg=CARD)
+        rrow4.pack(fill="x", padx=14, pady=(0, 4))
+        tk.Label(rrow4, text="Liste éditée", bg=CARD, fg=TEXT, font=F(11, True)).pack(side="left")
+        self.aa_tier_btns = {}
+        for t in (1, 2):
+            bt = Btn(rrow4, "", lambda t=t: self.set_aa_tier(t), bg=GREY, fg=TEXT, size=9, padx=8, pady=3)
+            bt.pack(side="left", padx=(6, 0))
+            self.aa_tier_btns[t] = bt
+        tk.Label(rrow4, text="Reset de secours (13+ épuisés) au floor", bg=CARD, fg=TEXT, font=F(11, True)).pack(side="left", padx=(24, 0))
+        Btn(rrow4, "−", lambda: self.step_aa("aa_fallback", -1), bg=GREY, fg=TEXT, size=11, padx=10, pady=2).pack(side="left", padx=(8, 0))
+        self.aa_fallback_lbl = tk.Label(rrow4, text="", bg=CARD, fg=BLUE, font=F(12, True), width=7)
+        self.aa_fallback_lbl.pack(side="left")
+        Btn(rrow4, "+", lambda: self.step_aa("aa_fallback", 1), bg=GREY, fg=TEXT, size=11, padx=10, pady=2).pack(side="left")
+        self.aa_res_lbl = tk.Label(self.aa_opts, text="", bg=CARD, fg=YELLOW, font=F(9, True), anchor="w")
+        self.aa_res_lbl.pack(fill="x", padx=14, pady=(0, 3))
         crow = None
         for i, n in enumerate(self.aa_chars):
             if i % 12 == 0:
@@ -584,7 +636,10 @@ class App(tk.Tk):
                      font=F(8)).pack(side="left", padx=(10, 0))
         tk.Label(self.aa_opts, text="Le bot insère le permit, lit le floor, ajoute les 2 bots, lance Deploy, met AUTO, retourne les cartes puis "
                  "Return. « Reset à partir du floor N » : si le permit est au floor N ou plus haut, il le remet au floor 1 avant de choisir le perso (jamais = pas de reset). "
-                 "« Floor actuel » : à donner seulement si le bot n'arrive pas à le lire (auto = il le lit). Images : templates_aa/.",
+                 "« Floor actuel » : à donner seulement si le bot n'arrive pas à le lire (auto = il le lit). "
+                 "Persos réservés : jaunes = floors 10+ (jusqu'au 2e palier), bleus = floors 13+ (UNIQUEMENT eux à partir du 2e palier) ; "
+                 "« Liste éditée » choisit la couleur donnée en cliquant un perso. Reset de secours : si plus aucun perso bleu n'a de "
+                 "stamina, le bot reset et ne monte plus au-delà de ce floor (aucun = il s'arrête et t'alerte). Images : templates_aa/.",
                  bg=CARD, fg=MUTED, font=F(8), anchor="w", justify="left", wraplength=800).pack(fill="x", padx=14, pady=(0, 6))
 
         # --- options mode Hero Trial : choix des persos ---
@@ -897,16 +952,27 @@ class App(tk.Tk):
         self.aa_reset_lbl.config(text=str(self.aa_reset) if self.aa_reset else "jamais")
         self.aa_floor_lbl.config(text=str(self.aa_floor) if self.aa_floor else "auto")
         self.aa_resfloor_lbl.config(text=str(self.aa_resfloor))
-        self.aa_res_lbl.config(text=(", ".join(AA_CHAR_NAMES.get(n, n.capitalize()) for n in self.aa_reserved) or "aucun perso réservé"))
+        nm = lambda lst: ", ".join(AA_CHAR_NAMES.get(n, n.capitalize()) for n in lst) or "aucun"   # noqa: E731
+        self.aa_res_lbl.config(text=f"Floors {self.aa_resfloor}+ : {nm(self.aa_reserved)}     |     "
+                                    f"Floors {self.aa_resfloor2}+ : {nm(self.aa_reserved2)}")
         for n, bt in self.aa_res_btns.items():
-            on = n in self.aa_reserved
-            bt.style(YELLOW if on else GREY, DARK if on else TEXT)
+            col = YELLOW if n in self.aa_reserved else BLUE if n in self.aa_reserved2 else None
+            bt.style(col or GREY, DARK if col else TEXT)
+        self.aa_resfloor2_lbl.config(text=str(self.aa_resfloor2))
+        self.aa_fallback_lbl.config(text=str(self.aa_fallback) if self.aa_fallback else "aucun")
+        for t, bt in self.aa_tier_btns.items():
+            col = YELLOW if t == 1 else BLUE
+            bt.config(text=f"Réservés {self.aa_resfloor if t == 1 else self.aa_resfloor2}+")
+            bt.style(col if t == self.aa_tier else GREY, DARK if t == self.aa_tier else TEXT)
         self.aa_lbl.config(text=" + ".join(AA_BOTS[b] for b in self.aa_bots) or "sans bot")
 
     def save_aa(self):
         self.cfg["aa_bots"], self.cfg["aa_reset_floor"] = list(self.aa_bots), self.aa_reset
         self.aa_resfloor = max(1, self.aa_resfloor)
         self.cfg["aa_reserved"], self.cfg["aa_reserve_floor"] = list(self.aa_reserved), self.aa_resfloor
+        self.aa_resfloor2 = max(self.aa_resfloor + 1, self.aa_resfloor2)
+        self.cfg["aa_reserved2"], self.cfg["aa_reserve2_floor"] = list(self.aa_reserved2), self.aa_resfloor2
+        self.cfg["aa_reset_fallback"] = self.aa_fallback
         if self.aa_floor:
             self.cfg["aa_floor"] = self.aa_floor
         else:
@@ -926,13 +992,21 @@ class App(tk.Tk):
         self.save_aa()
 
     def toggle_aa_res(self, n):
+        """Clic sur un perso : il entre dans la liste editee (10+ ou 13+), ou en sort s'il y etait deja."""
         if self.locked():
             return
-        if n in self.aa_reserved:
-            self.aa_reserved.remove(n)
+        mine, other = (self.aa_reserved, self.aa_reserved2) if self.aa_tier == 1 else (self.aa_reserved2, self.aa_reserved)
+        if n in mine:
+            mine.remove(n)
         else:
-            self.aa_reserved.append(n)
+            if n in other:
+                other.remove(n)                          # un perso est dans UNE seule liste
+            mine.append(n)
         self.save_aa()
+
+    def set_aa_tier(self, t):
+        self.aa_tier = t
+        self.paint_aa()
 
     def step_aa(self, what, d):
         if self.locked():
@@ -1958,6 +2032,8 @@ class App(tk.Tk):
         elif self.mode == "aa":
             cmd += ["--bots", ",".join(self.aa_bots), "--reset-floor", str(self.aa_reset)]
             cmd += ["--reserve", ",".join(self.aa_reserved) or "aucun", "--reserve-floor", str(self.aa_resfloor)]
+            cmd += ["--reserve2", ",".join(self.aa_reserved2) or "aucun", "--reserve2-floor", str(self.aa_resfloor2),
+                    "--reset-fallback", str(self.aa_fallback)]
             if self.aa_floor:
                 cmd += ["--floor", str(self.aa_floor)]
             cmd += [self.wd_flag()]

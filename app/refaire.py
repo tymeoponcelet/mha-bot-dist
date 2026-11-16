@@ -7,6 +7,8 @@
 - check() : avec les MEMES zones et seuils que le bot -> score sur la capture d'origine + pire confusion sur les autres
   captures (une autre image trop proche = faux positif possible).
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import shutil
 import subprocess

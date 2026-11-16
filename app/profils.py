@@ -7,6 +7,8 @@
 - Jamais les reglages propres au PC (MACHINE) : chemin d'adb, appareil, paquet du jeu, reglages techniques.
 - profils.json est une donnee perso du PC (comme config.json) : jamais publiee, jamais ecrasee par une mise a jour.
 """
+import os  # noqa: E402
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")   # memoire : sinon numpy reserve ~370 Mo par processus (16/11/2026 : « Insufficient memory » chez un ami)
 import json
 import re
 from pathlib import Path
