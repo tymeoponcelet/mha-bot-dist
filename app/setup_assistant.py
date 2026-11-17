@@ -250,6 +250,9 @@ class StepEditor(tk.Frame):
             fbs = ["aucun"] + [str(i) for i in range(2, 31)]
             self.w["fallback"] = self._combo(rrow2, "Reset de secours (13+ épuisés) au floor", fbs, 6,
                                              fbs.index(str(fb)) if str(fb) in fbs else 0)
+            self.w["rush"] = tk.BooleanVar(value=bool(cfg.get("aa_rush", True)))
+            tk.Checkbutton(rrow2, text="⚡ Rush jusqu'au floor 10", variable=self.w["rush"], bg=self.bg, fg=TEXT, selectcolor=BG,
+                           activebackground=self.bg, activeforeground=TEXT, font=F(9, True)).pack(side="left", padx=(12, 0))
             self.w["reserve2"] = {}
             row = None
             for i, c in enumerate(ec.aa_chars()):
@@ -317,6 +320,7 @@ class StepEditor(tk.Frame):
             st["reserve2"] = r2 or None
             st["resfloor2"] = int(self.w["resfloor2"].get()) if r2 else None
             st["fallback"] = (None if self.w["fallback"].current() == 0 else int(self.w["fallback"].get())) if r2 else None
+            st["rush"] = None if self.w["rush"].get() else False      # coche (defaut) : rien dans l'etape
         elif self.w["hero"].current() > 0:
             st["hero"] = self.heroes[self.w["hero"].current() - 1]
         try:
@@ -357,6 +361,7 @@ class App(tk.Tk):
         self.aa_resfloor2 = int(self.cfg.get("aa_reserve2_floor", 13) or 13)
         self.aa_fallback = int(self.cfg.get("aa_reset_fallback", 0) or 0)
         self.aa_tier = 1                                 # liste editee par les boutons des persos : 1 = 10+, 2 = 13+
+        self.aa_rush = tk.BooleanVar(value=bool(self.cfg.get("aa_rush", True)))
         self.whm_level = int(self.cfg.get("whm_level", 3) or 3)
         self.whm_lvl_btns = {}
         self.whm_event = self.cfg.get("whm_event") if self.cfg.get("whm_event") in WHM_EVENTS else "entrance"
@@ -623,6 +628,9 @@ class App(tk.Tk):
         Btn(rrow4, "+", lambda: self.step_aa("aa_fallback", 1), bg=GREY, fg=TEXT, size=11, padx=10, pady=2).pack(side="left")
         self.aa_res_lbl = tk.Label(self.aa_opts, text="", bg=CARD, fg=YELLOW, font=F(9, True), anchor="w")
         self.aa_res_lbl.pack(fill="x", padx=14, pady=(0, 3))
+        tk.Checkbutton(self.aa_opts, text="⚡  Rush jusqu'au floor 10 (sous le floor 10 : Rush au lieu d'un combat, +3 floors)",
+                       variable=self.aa_rush, command=self.save_aa, bg=CARD, fg=TEXT, selectcolor=BG, activebackground=CARD,
+                       activeforeground=TEXT, font=F(10, True)).pack(anchor="w", padx=14, pady=(0, 3))
         crow = None
         for i, n in enumerate(self.aa_chars):
             if i % 12 == 0:
@@ -973,6 +981,7 @@ class App(tk.Tk):
         self.aa_resfloor2 = max(self.aa_resfloor + 1, self.aa_resfloor2)
         self.cfg["aa_reserved2"], self.cfg["aa_reserve2_floor"] = list(self.aa_reserved2), self.aa_resfloor2
         self.cfg["aa_reset_fallback"] = self.aa_fallback
+        self.cfg["aa_rush"] = bool(self.aa_rush.get())
         if self.aa_floor:
             self.cfg["aa_floor"] = self.aa_floor
         else:
@@ -2029,7 +2038,7 @@ class App(tk.Tk):
             cmd += ["--bots", ",".join(self.aa_bots), "--reset-floor", str(self.aa_reset)]
             cmd += ["--reserve", ",".join(self.aa_reserved) or "aucun", "--reserve-floor", str(self.aa_resfloor)]
             cmd += ["--reserve2", ",".join(self.aa_reserved2) or "aucun", "--reserve2-floor", str(self.aa_resfloor2),
-                    "--reset-fallback", str(self.aa_fallback)]
+                    "--reset-fallback", str(self.aa_fallback), "--rush" if self.aa_rush.get() else "--no-rush"]
             if self.aa_floor:
                 cmd += ["--floor", str(self.aa_floor)]
             cmd += [self.wd_flag()]

@@ -524,7 +524,7 @@ class FarmView(OwnerView):
                           color=B.COLORS.get(KIND[self.st["mode"]], B.COLORS["info"]))
         tips = "Choisis dans les menus, puis ▶ Lancer (ou 🗓️ Programmer). 🔋 / 🛡️ : pour ce lancement seulement."
         if aa:
-            tips += " Floors des réservés, réservés 13+ et reset de secours : réglages de l'assistant (ou /aa)."
+            tips += " Floors des réservés, réservés 13+, reset de secours et Rush : réglages de l'assistant (ou /aa)."
         e.set_footer(text=tips)
         return e
 
@@ -615,6 +615,8 @@ class FarmView(OwnerView):
         if self.key == "aa":
             self.st["bots"] = ",".join([b for b in (B.cfg_get("aa_bots") or ["deku", "bakugo"]) if b in self.ec.AA_BOTS][:2])
             self.st["reserve"] = ",".join(c for c in (B.cfg_get("aa_reserved") or []) if c in self.ec.aa_chars()) or None
+            if not B.cfg_get("aa_rush", True):            # Rush : repris de l'assistant (coche par defaut)
+                self.st["rush"] = False
             r1 = set(str(self.st["reserve"] or "").split(","))
             r2 = [c for c in (B.cfg_get("aa_reserved2") or []) if c in self.ec.aa_chars() and c not in r1]
             if r2:                                        # 2e palier : repris de l'assistant (plus de place dans le message)

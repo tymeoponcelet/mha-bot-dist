@@ -39,6 +39,14 @@ WATCHDOG = None                               # idem pour --watchdog / --no-watc
 REFILL = None                                 # True / False = --refill / --no-refill transmis aux bots (None : config.json)
 
 
+def _rush(v):
+    """Champ Rush d'une etape Agency : 'rush' / 'norush' (sinon : etape illisible)."""
+    v = v.lower()
+    if v not in ("rush", "norush"):
+        raise ValueError(v)
+    return v == "rush"
+
+
 def parse_token(tok):
     p = [x.strip() for x in tok.split(":")]
     kind = p[0].lower()
@@ -56,7 +64,8 @@ def parse_token(tok):
                         resfloor=int(p[5]) if len(p) > 5 and p[5] else None,
                         reserve2=p[6].lower() if len(p) > 6 and p[6] else None,         # reserves floors 13+
                         resfloor2=int(p[7]) if len(p) > 7 and p[7] else None,
-                        fallback=int(p[8]) if len(p) > 8 and p[8] else None)            # reset de secours
+                        fallback=int(p[8]) if len(p) > 8 and p[8] else None,            # reset de secours
+                        rush=(_rush(p[9]) if len(p) > 9 and p[9] else None))
         if kind in ("whm", "event", "evenement", "entrance", "hallway", "library"):
             return dict(mode="whm", event=kind if kind in ("hallway", "library") else "entrance", level=int(p[1]),
                         runs=int(p[2]) if len(p) > 2 else 1, hero=p[3] if len(p) > 3 else None)
@@ -169,7 +178,8 @@ def token(st):
         f = [str(st["runs"]), st.get("bots") or "", "" if st.get("reset") is None else str(st["reset"]),
              st.get("reserve") or "", str(st["resfloor"]) if st.get("resfloor") else "",
              st.get("reserve2") or "", str(st["resfloor2"]) if st.get("resfloor2") else "",
-             str(st["fallback"]) if st.get("fallback") else ""]
+             str(st["fallback"]) if st.get("fallback") else "",
+             "" if st.get("rush") is None else ("rush" if st["rush"] else "norush")]
         while len(f) > 1 and f[-1] == "":              # champs facultatifs vides en fin : on les retire
             f.pop()
         return "aa:" + ":".join(f)
@@ -198,6 +208,8 @@ def describe(st):
             res += f" · floors {st.get('resfloor2') or 13}+ : {who}" if who else ""
         if st.get("fallback"):
             res += f" · reset de secours au floor {st['fallback']}"
+        if st.get("rush") is False:
+            res += " · sans rush"
         return f"Agency Assessment · {st['runs']} combat(s)" + (f" · bots {bots}" if bots else "") + reset + res
     chars = ", ".join(c.capitalize() for c in str(st.get("chars", "")).split(",") if c)
     return f"Hero Trial · {chars}{h}"
@@ -236,6 +248,8 @@ def command(st):
             c += ["--reserve2-floor", str(st["resfloor2"])]
         if st.get("fallback") is not None:
             c += ["--reset-fallback", str(st["fallback"])]
+        if st.get("rush") is not None:
+            c.append("--rush" if st["rush"] else "--no-rush")
         if WATCHDOG is not None:
             c.append("--watchdog" if WATCHDOG else "--no-watchdog")
         return c                                   # pas de --hero ni de recharge de stamina dans ce mode

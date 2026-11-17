@@ -71,6 +71,8 @@ RESERVE_FLOOR = 10             # a partir de ce floor on joue les persos reserve
 RESERVED2 = []                 # 2e liste : persos gardes pour les TRES hauts floors (UNIQUEMENT eux a partir de RESERVE2_FLOOR)
 RESERVE2_FLOOR = 13
 RESET_FALLBACK = 0             # reset de secours : plus aucun reserve 13+ jouable -> reset des ce floor (0 = arret + alerte)
+RUSH = True                    # sous le floor 10 : Rush (+3 floors sans combat) au lieu de Deploy, si le bouton est la
+RUSH_MAX = 10                  # le Rush du jeu monte jusqu'au floor 10
 ICON_DY = 75                   # distance entre la barre de stamina et le centre de l'icone du perso (menu Battle Settings)
 try:
     _c = json.loads((BASE / "config.json").read_text(encoding="utf-8"))
@@ -86,6 +88,7 @@ try:
     RESERVED2 = [str(n).lower() for n in (_c.get("aa_reserved2") or [])]
     RESERVE2_FLOOR = max(1, int(_c.get("aa_reserve2_floor", RESERVE2_FLOOR) or RESERVE2_FLOOR))
     RESET_FALLBACK = max(0, int(_c.get("aa_reset_fallback", RESET_FALLBACK) or 0))
+    RUSH = bool(_c.get("aa_rush", RUSH))
 except Exception:
     pass
 
@@ -114,6 +117,10 @@ if _arg("--reserve2-floor") is not None:
     RESERVE2_FLOOR = max(1, _arg("--reserve2-floor"))
 if _arg("--reset-fallback") is not None:
     RESET_FALLBACK = max(0, _arg("--reset-fallback"))
+if "--rush" in sys.argv:
+    RUSH = True
+if "--no-rush" in sys.argv:
+    RUSH = False
 
 BTN = (0.15, 0.15, 0.85, 0.85)                 # boutons jaunes : on compare le TEXTE, pas le fond (tous identiques)
 SPEC = {                                       # du plus avance au plus ancien
@@ -129,6 +136,8 @@ SPEC = {                                       # du plus avance au plus ancien
     "closereset":   dict(cd=2.0, crop=(0.05, 0.10, 0.72, 0.95), thr=0.75),     # croix de la page My Permit, apres le reset
     "add":          dict(cd=1.5, crop=BTN, thr=0.80),
     "deploy":       dict(cd=6.0, crop=(0.25, 0.25, 0.75, 0.75), thr=0.72),     # sans les etoiles animees
+    "rush":         dict(cd=6.0, crop=BTN, thr=0.90),          # rushaa.png ; le bouton Bots jaune lui ressemble a 0,78
+    "confirmrush":  dict(cd=3.0, crop=BTN, thr=0.80),          # IDENTIQUE au Confirm du reset : tape seulement juste apres Rush
     "permit":       dict(cd=3.0, crop=(0.36, 0.04, 1.0, 0.30), thr=0.78),      # titre "Agency Assessment" + roue dentee
     "insertpermit": dict(cd=3.0, crop=(0.05, 0.15, 0.85, 0.85), thr=0.72),
     "bots":         dict(cd=3.0, crop=BTN, thr=0.80),
@@ -141,7 +150,7 @@ SPEC = {                                       # du plus avance au plus ancien
     "coop":         dict(cd=3.0, crop=(0.1, 0.1, 0.9, 0.75), thr=0.78),
     "ua":           dict(cd=3.0, crop=(0, 0.30, 1, 1)),                        # menu principal : icone U.A. (Solo / Co-op)
 }
-OPTIONAL = {"botsgris", "myteam", "revive", "closereset"}                         # images facultatives
+OPTIONAL = {"botsgris", "myteam", "revive", "closereset", "rush", "confirmrush"}  # images facultatives
 AUTO_OFF_THR = 0.85   # AUTO est un interrupteur : eteint 0,92-0,95, ALLUME 0,68-0,69 (le taper l'eteignait, bug du 16/11)
 
 
@@ -150,7 +159,7 @@ def auto_is_off(score):
     return score >= AUTO_OFF_THR
 
 
-FILES = {"revive": "revivefree.png", "cards": "cardflip2.png", "auto": BASE / "templates_nightops" / "auto.png",
+FILES = {"rush": "rushaa.png", "revive": "revivefree.png", "cards": "cardflip2.png", "auto": BASE / "templates_nightops" / "auto.png",
          "ua": BASE / "templates_nightops" / "ua.png"}
 # cardflip2.png (1574x532) : centre de l'ancre "Each player can flip" et centres des 5 cartes
 CARD_ANCHOR = (830.5, 157.5)
@@ -163,7 +172,7 @@ BOT_T = {}
 ST = {}                                         # images des barres de stamina
 CH = {}                                         # visages des persos reserves (templates_aa/chars/<nom>.png)
 CH2 = {}                                        # visages des persos reserves pour les floors RESERVE2_FLOOR+
-STATS = {"chars": {}, "floor_max": 0, "resets": 0, "fallback": None, "current": None}   # bilan de la session
+STATS = {"chars": {}, "floor_max": 0, "resets": 0, "fallback": None, "current": None, "rush": 0}   # bilan de la session
 ICONS = {}                                      # visages de tous les persos connus (sert a trouver ton perso dans le lobby)
 FACE = (0.14, 0.12, 0.86, 0.60)                 # partie comparee d'une icone : le visage (sans cadre, sans "Lv. 90")
 ICON_W = 135                                    # largeur normale d'une icone a l'ecran ; les images plus petites sont agrandies
@@ -603,7 +612,8 @@ def bilan():
     n = sum(STATS["chars"].values())
     if not n and not STATS["resets"]:
         return
-    print(f"=== BILAN AA : {n} combat(s) | floor max : {STATS['floor_max'] or '?'} | resets : {STATS['resets']}", flush=True)
+    print(f"=== BILAN AA : {n} combat(s)" + (f" dont {STATS['rush']} rush" if STATS["rush"] else "")
+          + f" | floor max : {STATS['floor_max'] or '?'} | resets : {STATS['resets']}", flush=True)
     if STATS["chars"]:
         print("   persos : " + ", ".join(f"{k} x{v}" for k, v in sorted(STATS["chars"].items(), key=lambda kv: -kv[1])),
               flush=True)
@@ -638,6 +648,7 @@ def _main():
     last = {n: 0.0 for n in SPEC}
     runs, auto_taps = 0, 0
     auto_seen_on = False
+    rush_t = 0.0                                        # heure du tap sur Rush (le Confirm qui suit est celui du Rush)
     in_battle, t_start = False, 0.0
     bots_done, char_done, flipped = False, False, False
     floor, floor_known = FLOOR, FLOOR is not None       # floor courant ; connu = lu sur le permit, donne, ou apres un reset
@@ -651,7 +662,8 @@ def _main():
           f"floor de depart : {floor if floor_known else 'a lire'}"
           + (f" | reserves pour les floors {RESERVE_FLOOR}+ : {', '.join(CH)}" if CH else "")
           + (f" | reserves pour les floors {RESERVE2_FLOOR}+ : {', '.join(CH2)}" if CH2 else "")
-          + (f" | reset de secours : floor {RESET_FALLBACK}" if RESET_FALLBACK else "") + ". Ctrl+C pour arreter.")
+          + (f" | reset de secours : floor {RESET_FALLBACK}" if RESET_FALLBACK else "")
+          + (f" | rush jusqu'au floor {RUSH_MAX}" if RUSH and "rush" in T else " | sans rush") + ". Ctrl+C pour arreter.")
 
 
     def tap_key(key, h, extra=""):
@@ -689,6 +701,14 @@ def _main():
 
         if "revive" in ready:                              # perso mort au combat : resurrection gratuite
             tap_key("revive", hits["revive"], " : resurrection gratuite")
+            continue
+
+        if "confirmrush" in ready and rush_t and now - rush_t < 15 and not resetting:
+            tap_key("confirmrush", hits["confirmrush"], " (rush)")
+            rush_t = 0.0
+            in_battle, t_start, auto_taps, flipped = True, time.time(), 0, False   # comme un combat : cartes puis Return
+            auto_seen_on = False
+            STATS["rush"] += 1
             continue
 
         # --- 1. fin de combat : cartes puis Return ---
@@ -864,6 +884,29 @@ def _main():
                     raise Done(f"Plus aucun perso avec de la stamina. {runs}/{MAX_RUNS} combat(s) faits. Fini !")
                 if r:
                     continue
+            if (RUSH and "rush" in T and char_done and (bots_done or not BOTS) and floor_known and floor is not None
+                    and floor < RUSH_MAX):
+                h = hits.get("rush")
+                bt = hits.get("bots") or hits.get("botsgris") or BOTS_POS[0]      # Bots vu maintenant, ou deja vu ici
+                if h and bt and abs(h[0] - bt[0]) < 40 and abs(h[1] - bt[1]) < 30:
+                    h = None                               # c'est le bouton Bots (il ressemble a Rush) : jamais le taper
+                if h:
+                    if "rush" in ready:
+                        if "rushvu" not in SEEN_DIGITS:    # 1re fois : capture pour verifier la reconnaissance
+                            SEEN_DIGITS.add("rushvu")
+                            debug_shot("rush_vu", screen)
+                        tap_key("rush", h, f" : rush depuis le floor {floor}")
+                        rush_t = time.time()
+                    else:
+                        time.sleep(nt.LOOP_DELAY)
+                    continue
+                if now - last_action < 3:                  # le bouton peut apparaitre un peu apres le choix du perso
+                    time.sleep(nt.LOOP_DELAY)
+                    continue
+                if "rushabs" not in SEEN_DIGITS:
+                    SEEN_DIGITS.add("rushabs")
+                    log(f"(!) floor {floor} : bouton Rush non trouve -> combat normal (capture debug/aa_rush_absent)")
+                    debug_shot("rush_absent", screen)
             if "deploy" in ready and ("permit" in hits or "insertpermit" not in hits) and (bots_done or not BOTS):
                 deploy_tries += 1
                 tap_key("deploy", hits["deploy"], f" (essai {deploy_tries})" if deploy_tries > 1 else "")

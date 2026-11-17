@@ -1,6 +1,6 @@
 {
- "version": "2026.11.17-003639",
- "message": "",
+ "version": "2026.11.17-183220",
+ "message": "rush aa",
  "files": {
   "GUIDE_AMI.txt": {
    "sha256": "263776b406438b0552f00c1214756ab1873b253a6aa6ceff18ab9c333baaaab1",
@@ -19,8 +19,8 @@
    "size": 5649
   },
   "auto_aa.py": {
-   "sha256": "04797ac8d8fed75c94ee62c2b6506acd5a18edc0e702b26a6afbf3bda56f6c24",
-   "size": 48204
+   "sha256": "504178cda28d9c66d3772795ef668fdd34831e30e81110fc69eb2bdf83f14f38",
+   "size": 50979
   },
   "auto_hero_trial.py": {
    "sha256": "757b269082ab9013f32db5ecc54e6294b26d3bf3a654d25042706d77f44a5b6c",
@@ -71,24 +71,24 @@
    "size": 6085
   },
   "discord_bot.py": {
-   "sha256": "e7c97acc74deb0062161ff40a652a7d58928b072ba4755f167fae2aa60a29ac3",
-   "size": 61321
+   "sha256": "e6aa679090d88f98b92396d10b1c11f4ace3a0947fca94ee7643e1b7f7ed73c8",
+   "size": 61898
   },
   "discord_config.example.json": {
    "sha256": "53f945026eb4ae84eeb29e070857dc392ab67408a2316568e3518781938e6e89",
    "size": 226
   },
   "discord_ui.py": {
-   "sha256": "521f0cd58f8a2624a92074b0291e6e7c24a1565fc205e8ad9625c5a1a63c9005",
-   "size": 49948
+   "sha256": "cbbf794ce9c9a8ddcc284544a896d59a9f0eba363bb41498bc39ec8ffd93380d",
+   "size": 50104
   },
   "emulateur.py": {
    "sha256": "5552445dfb45f5893f2880adb94b2fde7be0aa4c97e1352fa2b6569f6a62806a",
    "size": 7153
   },
   "enchainer.py": {
-   "sha256": "1a87c489330eedcb5fe408cd0a7d32cc4b727b112797e7a7ce38809908e3b6c3",
-   "size": 16398
+   "sha256": "398561271052ac8f4942840052f7ca309169147ca28b8f3df747f5da80544f08",
+   "size": 16940
   },
   "encours.py": {
    "sha256": "8f2f7f4c67eb4d91e92ed41b1c0d0016c815be8fb3695b5528dd0cae621a7c68",
@@ -171,8 +171,8 @@
    "size": 199
   },
   "setup_assistant.py": {
-   "sha256": "cde444a1787becd2d1653940add0a13e6c4b284b5ce54cea2604a512d8d49a45",
-   "size": 124858
+   "sha256": "225f1a07337517fd6b288625aeac76bb0f4ae6ffbc35b7266bfb0053f548912b",
+   "size": 125844
   },
   "stats.py": {
    "sha256": "baf3255e77431770fe933e7f7999ba510ba45f11e07fbadfa0eaafa17013f38a",
@@ -374,6 +374,10 @@
    "sha256": "adcfcf7d5be15b445c704fdbaa0dc5a3c3172d390d6a977418b530584a56ebaa",
    "size": 25535
   },
+  "templates_aa/confirmrush.png": {
+   "sha256": "92f2547144e39d8a241ab75cc0a617bdd32dd51f2b95ff10634b9cad91c765cd",
+   "size": 25193
+  },
   "templates_aa/coop.png": {
    "sha256": "48d2ada7281331f2d436ab9bb5747f383f5777765a23bf593307af169d0c4a42",
    "size": 45504
@@ -481,6 +485,10 @@
   "templates_aa/revivefree.png": {
    "sha256": "68dba5bf6c20900c661822c601ff36197a405a6d73b6877c9f2d541c153b2ff6",
    "size": 38375
+  },
+  "templates_aa/rushaa.png": {
+   "sha256": "4fc2b6f7a7f17e54eb8d3de1f8c6a23b7026203388080008533ce88deb7a910f",
+   "size": 9163
   },
   "templates_aa/shoto.png": {
    "sha256": "874548fd63f153642a2f7a50bc7e489b45f16555fcd6e8f9447b28bd2fa14dd4",
