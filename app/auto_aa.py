@@ -74,6 +74,7 @@ RESET_FALLBACK = 0             # reset de secours : plus aucun reserve 13+ jouab
 RUSH = True                    # sous le floor 10 : Rush (+3 floors sans combat) au lieu de Deploy, si le bouton est la
 RUSH_MAX = 10                  # le Rush du jeu monte jusqu'au floor 10
 RUSH_IDLE = 7.0                # s sans carte ni Return : la serie d'ecrans de cartes du Rush est finie (lobby)
+RUSH_CARD_WAIT = 2.5           # Rush : attendre que l'ecran de cartes soit pose avant de choisir (demande du 17/11)
 REFLIP_S = 5.0                 # cartes encore affichees 5 s apres les avoir retournees (2 sur 3 vues le 17/11) : on recommence
 ICON_DY = 75                   # distance entre la barre de stamina et le centre de l'icone du perso (menu Battle Settings)
 try:
@@ -718,6 +719,11 @@ def _main():
         if "cards" in hits and flipped and rush_evt and now - last_action > REFLIP_S:
             flipped = False                                # Rush : l'ecran de cartes est toujours la -> on retourne encore
             log("cartes du rush encore affichees : je les retourne de nouveau")
+        if "cards" not in hits:
+            last.pop("_cards0", None)
+        elif rush_evt and not flipped and now - last.setdefault("_cards0", now) < RUSH_CARD_WAIT:
+            time.sleep(nt.LOOP_DELAY)                      # Rush : cartes affichees depuis moins de 2,5 s -> on attend
+            continue
         if "cards" in hits and not flipped:
             t = T["cards"]
             _sc, loc = t.best(screen)
@@ -726,6 +732,7 @@ def _main():
                 nt.tap(ax + cx - CARD_ANCHOR[0], ay + cy - CARD_ANCHOR[1])
                 time.sleep(0.9)
             flipped, last_action, in_battle = True, time.time(), False
+            last.pop("_cards0", None)
             log(f"cartes retournees ({CARDS}) | run {runs}/{MAX_RUNS}")
             if rush_evt:
                 rush_evt = time.time()

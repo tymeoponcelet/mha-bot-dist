@@ -1,5 +1,5 @@
 {
- "version": "2026.11.17-192334",
+ "version": "2026.11.17-194318",
  "message": "",
  "files": {
   "GUIDE_AMI.txt": {
@@ -19,8 +19,8 @@
    "size": 5649
   },
   "auto_aa.py": {
-   "sha256": "a40dc82e1f6913f2aa3cfd68feeec5f5ff96006bdfcfd65ca35d6cd8ba04a6c1",
-   "size": 53398
+   "sha256": "7e1b1e93a12107887348a331942a1ca8c05a7ecaac57004428ba1a8e226caa3b",
+   "size": 53862
   },
   "auto_hero_trial.py": {
    "sha256": "757b269082ab9013f32db5ecc54e6294b26d3bf3a654d25042706d77f44a5b6c",
