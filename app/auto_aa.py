@@ -73,6 +73,8 @@ RESERVE2_FLOOR = 13
 RESET_FALLBACK = 0             # reset de secours : plus aucun reserve 13+ jouable -> reset des ce floor (0 = arret + alerte)
 RUSH = True                    # sous le floor 10 : Rush (+3 floors sans combat) au lieu de Deploy, si le bouton est la
 RUSH_MAX = 10                  # le Rush du jeu monte jusqu'au floor 10
+RUSH_IDLE = 7.0                # s sans carte ni Return : la serie d'ecrans de cartes du Rush est finie (lobby)
+REFLIP_S = 5.0                 # cartes encore affichees 5 s apres les avoir retournees (2 sur 3 vues le 17/11) : on recommence
 ICON_DY = 75                   # distance entre la barre de stamina et le centre de l'icone du perso (menu Battle Settings)
 try:
     _c = json.loads((BASE / "config.json").read_text(encoding="utf-8"))
@@ -649,6 +651,7 @@ def _main():
     runs, auto_taps = 0, 0
     auto_seen_on = False
     rush_t = 0.0                                        # heure du tap sur Rush (le Confirm qui suit est celui du Rush)
+    rush_evt = 0.0                                      # serie de cartes du Rush : derniere carte / Return (0 = pas de rush)
     in_battle, t_start = False, 0.0
     bots_done, char_done, flipped = False, False, False
     floor, floor_known = FLOOR, FLOOR is not None       # floor courant ; connu = lu sur le permit, donne, ou apres un reset
@@ -705,13 +708,16 @@ def _main():
 
         if "confirmrush" in ready and rush_t and now - rush_t < 15 and not resetting:
             tap_key("confirmrush", hits["confirmrush"], " (rush)")
-            rush_t = 0.0
+            rush_t, rush_evt = 0.0, time.time()
             in_battle, t_start, auto_taps, flipped = True, time.time(), 0, False   # comme un combat : cartes puis Return
             auto_seen_on = False
             STATS["rush"] += 1
             continue
 
         # --- 1. fin de combat : cartes puis Return ---
+        if "cards" in hits and flipped and rush_evt and now - last_action > REFLIP_S:
+            flipped = False                                # Rush : l'ecran de cartes est toujours la -> on retourne encore
+            log("cartes du rush encore affichees : je les retourne de nouveau")
         if "cards" in hits and not flipped:
             t = T["cards"]
             _sc, loc = t.best(screen)
@@ -721,6 +727,11 @@ def _main():
                 time.sleep(0.9)
             flipped, last_action, in_battle = True, time.time(), False
             log(f"cartes retournees ({CARDS}) | run {runs}/{MAX_RUNS}")
+            if rush_evt:
+                rush_evt = time.time()
+                if "rushcartes" not in SEEN_DIGITS:        # 1 capture par session : pour verifier la serie de cartes
+                    SEEN_DIGITS.add("rushcartes")
+                    debug_shot("rush_cartes", nt.screenshot())
             if WD:
                 WD.kick()
             time.sleep(1.0)
@@ -737,6 +748,12 @@ def _main():
                 who = STATS["current"] or "perso deja place"
                 STATS["chars"][who] = STATS["chars"].get(who, 0) + 1
             in_battle, flipped, bots_done, char_done, deploy_tries, nav_taps = False, False, False, False, 0, 0
+            if rush_evt:
+                rush_evt = time.time()
+                if "rushreturn" not in SEEN_DIGITS:
+                    SEEN_DIGITS.add("rushreturn")
+                    time.sleep(1.0)
+                    debug_shot("rush_apres_return", nt.screenshot())
             if WD:
                 WD.kick()
             if runs >= MAX_RUNS:
@@ -746,6 +763,15 @@ def _main():
             in_battle = False
             tap_key("cardflip", hits["cardflip"])
             continue
+
+        # --- serie d'ecrans de cartes du Rush : le lobby reste visible DERRIERE -> aucune action du lobby ---
+        if rush_evt:
+            if now - rush_evt < RUSH_IDLE:
+                in_battle = False
+                time.sleep(nt.LOOP_DELAY)
+                continue
+            rush_evt = 0.0
+            log("rush termine : retour au lobby")
 
         # --- 2. combat ---
         if in_battle:
