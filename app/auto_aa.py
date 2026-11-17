@@ -744,6 +744,8 @@ def _main():
                 floor = None
                 last.pop("_read", None)
                 last.pop("_fl0", None)
+                last.pop("_lob0", None)
+                last.pop("_lobwarn", None)
                 log(f"combat termine ({runs}/{MAX_RUNS})")
                 who = STATS["current"] or "perso deja place"
                 STATS["chars"][who] = STATS["chars"].get(who, 0) + 1
@@ -808,6 +810,8 @@ def _main():
                         resetting, floor, floor_known, bots_done, char_done = False, 1, True, False, False
                         floor_read = False
                         last.pop("_fl0", None)
+                        last.pop("_lob0", None)
+                        last.pop("_lobwarn", None)
                         after_reset = time.time()          # il reste a fermer la page avec la croix (closereset)
                         log("permit remis au floor 1")
                         STATS["resets"] += 1
@@ -888,6 +892,15 @@ def _main():
                         + (", reset de secours : reserves 13+ epuises)" if STATS["fallback"] else ")"))
                     resetting, last_action = True, time.time()
                     continue
+            if not (floor_read or floor_known):            # REGLE : ni bots, ni perso, ni Rush, ni Deploy avant le floor lu
+                t0 = last.setdefault("_lob0", now)         # (bug du 17/11 : permit pas encore reconnu -> Eijiro choisi au floor 10)
+                if now - t0 < 30:
+                    time.sleep(nt.LOOP_DELAY)
+                    continue
+                if not last.get("_lobwarn"):
+                    last["_lobwarn"] = now
+                    log("(!) floor toujours pas lu apres 30 s dans le lobby : je continue sans (pas de reserve ce combat)")
+                    debug_shot("lobby_sans_floor", screen)
             if "bots" not in hits and BOTS and not bots_done and bots_grey(screen):
                 bots_done = True
                 log("bouton Bots grise : les bots sont deja dans l'equipe")

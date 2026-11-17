@@ -1,6 +1,6 @@
 {
- "version": "2026.11.17-191123",
- "message": "bug cartes",
+ "version": "2026.11.17-192334",
+ "message": "",
  "files": {
   "GUIDE_AMI.txt": {
    "sha256": "263776b406438b0552f00c1214756ab1873b253a6aa6ceff18ab9c333baaaab1",
@@ -19,8 +19,8 @@
    "size": 5649
   },
   "auto_aa.py": {
-   "sha256": "42b97a3351c21203f5399b19418d389a3c35503a2b4a14b6aa76beffa5ff2bbe",
-   "size": 52578
+   "sha256": "a40dc82e1f6913f2aa3cfd68feeec5f5ff96006bdfcfd65ca35d6cd8ba04a6c1",
+   "size": 53398
   },
   "auto_hero_trial.py": {
    "sha256": "757b269082ab9013f32db5ecc54e6294b26d3bf3a654d25042706d77f44a5b6c",
